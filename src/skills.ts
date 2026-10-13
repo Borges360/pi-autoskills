@@ -103,6 +103,12 @@ export function selectSkills(
   };
 }
 export class AutoSkills implements Service {
+  menuGroups = {
+    Active: ["show"],
+    Suggestions: ["explain", "detect"],
+    Agents: ["agents"],
+    Settings: ["config", "doctor", "off"],
+  };
   capabilities = ["skills.select.v1", "subagent.basic.v1"];
   menu = ["show", "detect", "agents", "explain", "auto"];
   catalog: SkillMetadata[] = [];
