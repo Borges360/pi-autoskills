@@ -103,11 +103,16 @@ export function selectSkills(
   };
 }
 export class AutoSkills implements Service {
+  modeDescriptions = {
+    auto: "Select audited skills when the task context matches.",
+    observe: "Show matching skills without adding them to the prompt.",
+    off: "Stop automatic skill selection.",
+  };
   menuGroups = {
     Active: ["show"],
     Suggestions: ["explain", "detect"],
     Agents: ["agents"],
-    Settings: ["config", "doctor", "off"],
+    Settings: ["config", "doctor"],
   };
   capabilities = ["skills.select.v1", "subagent.basic.v1"];
   menu = ["show", "detect", "agents", "explain", "auto"];
