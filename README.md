@@ -32,8 +32,12 @@ Run `/autoskills` for the interactive menu, or `/autoskills status` for structur
 headless output. Domain actions: `show, detect, explain, pin <skill...>, pin clear, agents, delegate <agent> <objective>, audit <file>, install <file-or-https-url> <sha256> <id>, update <file-or-https-url> <sha256> <id>`. Shared actions: `auto`, `off`,
 `observe`, `config`, `doctor`, `storage status`, `storage migrate files|sqlite|durable`.
 The CLI uses the same actions: `node dist/cli.js status`.
-TUI grouping: Active / Suggestions / Agents / Settings. Config opens a small mode wizard in the TUI; headless config
-returns validated settings. Edit the user config for advanced settings.
+TUI groups: Active / Suggestions / Agents / Settings. Press Escape in a group
+to return to the categories; Escape in the categories closes the menu. Settings
+**config** opens a centered mode panel showing the current mode and a short
+explanation of each option. Use the arrow keys to choose, Enter to save, and
+Escape to return to Settings. Headless config returns validated settings. Edit
+the user config for advanced settings.
 
 Default state: `~/.pi/agent/state/pi-autoskills/projects/<sha256-of-canonical-repository-root>/`.
 `PI_ECOSYSTEM_STATE_ROOT` changes the parent state directory for testing or deployment.

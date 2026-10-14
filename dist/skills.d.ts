@@ -22,6 +22,11 @@ export interface TaskSignals {
 export declare function selectSkills(task: TaskSignals, catalog: SkillMetadata[], maxActive?: number, minScore?: number, pins?: string[]): SkillDecision;
 export declare class AutoSkills implements Service {
     readonly host: Host;
+    modeDescriptions: {
+        auto: string;
+        observe: string;
+        off: string;
+    };
     menuGroups: {
         Active: string[];
         Suggestions: string[];
