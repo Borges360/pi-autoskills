@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { mkdtemp, rm, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -76,6 +77,7 @@ test("extension loads independently and all discovery commands work without TUI"
   process.env.PI_ECOSYSTEM_STATE_ROOT = join(root, "state");
   await mkdir(join(root, "cwd"));
   const cwd = join(root, "cwd");
+  let projectTrusted = false;
   const handlers = new Map(),
     commands = new Map(),
     tools = new Map(),
@@ -111,6 +113,8 @@ test("extension loads independently and all discovery commands work without TUI"
   extension(pi);
   assert.equal(commands.size, 1);
   assert.ok(tools.size >= 1);
+  const registeredCommandNames = [...commands.keys()];
+  const registeredToolNames = [...tools.keys()].sort();
   assert.equal(messages.length, 0);
   const ctx = {
     cwd,
@@ -124,7 +128,7 @@ test("extension loads independently and all discovery commands work without TUI"
         },
       },
     ),
-    isProjectTrusted: () => false,
+    isProjectTrusted: () => projectTrusted,
     getContextUsage: () => undefined,
     compact: () => {},
     signal: undefined,
@@ -152,32 +156,7 @@ test("extension loads independently and all discovery commands work without TUI"
     { messageType: "user", prompt: "Explain a small function" },
     ctx,
   );
-  const menus = [];
-  let rootSelections = 0;
-  let settingsSelections = 0;
-  const tui = {
-    ...ctx,
-    mode: "tui",
-    hasUI: true,
-    ui: {
-      select: async (title, choices) => {
-        menus.push({ title, choices });
-        if (title === displayName)
-          return rootSelections++ === 0 ? "Settings" : undefined;
-        return settingsSelections++ === 0 ? "doctor" : undefined;
-      },
-    },
-  };
-  await command.handler("", tui);
-  assert.equal(menus.length, 4);
-  assert.ok(menus[0].choices.includes("Settings"));
-  assert.equal(menus[1].title, `${displayName} / Settings`);
-  assert.equal(menus[2].title, `${displayName} / Settings`);
-  assert.equal(menus[3].title, displayName);
-  assert.ok(menus[1].choices.includes("config"));
-  assert.equal(menus[1].choices.includes("off"), false);
-  assert.equal(JSON.parse(messages.at(-1).content).standalone, true);
-
+  const tui = { ...ctx, mode: "tui", hasUI: true };
   const keybindings = {
     getKeys: (binding) =>
       ({
@@ -194,82 +173,272 @@ test("extension loads independently and all discovery commands work without TUI"
         "tui.select.down": "down",
       })[binding] === data,
   };
-  const configMenus = [];
-  let panelRuns = 0;
+  const interactions = [];
   let closedPanels = 0;
   let renderRequests = 0;
-  const configTui = {
+  const theme = {
+    fg: (_color, value) => value,
+    bg: (_color, value) => value,
+    bold: (value) => value,
+  };
+  const dashboardTui = {
     ...tui,
     ui: {
-      select: async (title, choices) => {
-        configMenus.push({ title, choices });
-        return undefined;
-      },
       custom: async (factory, options) => {
         assert.equal(options.overlay, true);
+        assert.equal(options.overlayOptions.anchor, "center");
+        const interaction = interactions.shift();
+        assert.equal(typeof interaction, "function", "unexpected settings panel");
+        let finish;
+        const finished = new Promise((resolve) => {
+          finish = resolve;
+        });
         const panel = await factory(
-          { requestRender: () => renderRequests++ },
           {
-            fg: (_color, value) => value,
-            bg: (_color, value) => value,
-            bold: (value) => value,
+            requestRender: () => renderRequests++,
+            terminal: { rows: 24 },
           },
+          theme,
           keybindings,
-          () => closedPanels++,
+          (action) => {
+            closedPanels++;
+            finish(action);
+          },
         );
-        const render = () =>
-          panel
-            .render(80)
-            .map((line) => line.trimEnd())
-            .join("\n");
-        assert.match(render(), new RegExp(`${displayName} / Settings / Mode`));
-        assert.match(render(), /Current mode: Automatic/);
-        assert.match(render(), /Choose a mode\n› Automatic  \(current\)/);
-        await panel.handleInput("down");
-        assert.match(render(), /› Observe/);
-        if (panelRuns++ === 0) {
-          await panel.handleInput("escape");
-          const unchanged = JSON.parse(
-            await readFile(
-              join(defaults(name).storage.root, "config.json"),
-              "utf8",
-            ),
-          );
-          assert.equal(unchanged.mode, "auto");
-          assert.equal(unchanged.enabled, true);
-        } else {
-          await panel.handleInput("enter");
-          assert.match(render(), /Current mode: Observe/);
-          assert.match(render(), /Saved: Observe\./);
-          const saved = JSON.parse(
-            await readFile(
-              join(defaults(name).storage.root, "config.json"),
-              "utf8",
-            ),
-          );
-          assert.equal(saved.mode, "observe");
-          assert.equal(saved.enabled, true);
-          await panel.handleInput("escape");
-        }
+        await interaction(panel);
+        return await finished;
       },
     },
   };
-  await command.handler("config", configTui);
-  await command.handler("config", configTui);
-  assert.equal(panelRuns, 2);
-  assert.equal(closedPanels, 2);
-  assert.equal(renderRequests, 3);
-  assert.deepEqual(
-    configMenus.map(({ title }) => title),
-    [
-      `${displayName} / Settings`,
-      displayName,
-      `${displayName} / Settings`,
-      displayName,
-    ],
-  );
+  const render = (panel, width = 80) =>
+    panel
+      .render(width)
+      .map((line) => line.trimEnd())
+      .join("\n");
+  const configPath = join(defaults(name).storage.root, "config.json");
+  const waitFor = async (predicate, description) => {
+    for (let i = 0; i < 50 && !predicate(); i++)
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.ok(predicate(), description);
+  };
+
+  interactions.push(async (panel) => {
+    for (const width of [40, 80, 120]) {
+      const lines = panel.render(width);
+      assert.ok(lines.every((line) => visibleWidth(line) === width));
+    }
+    assert.match(render(panel), new RegExp(`${displayName}`));
+    assert.match(render(panel), /Current mode: Automatic/);
+    assert.match(render(panel), /Active/);
+    assert.match(render(panel), /Suggestions/);
+    assert.match(render(panel), /Agents/);
+    assert.match(render(panel), /Settings/);
+    await panel.handleInput("enter");
+    assert.match(render(panel), /Show selected skills/);
+    await panel.handleInput("escape");
+    await panel.drain();
+    await panel.handleInput("down");
+    await panel.handleInput("enter");
+    assert.match(render(panel), /Explain selection/);
+    assert.match(render(panel), /Detect context/);
+    await panel.handleInput("escape");
+    await panel.drain();
+    await panel.handleInput("down");
+    await panel.handleInput("enter");
+    assert.match(render(panel), /Agents/);
+    await panel.handleInput("escape");
+    await panel.drain();
+    await panel.handleInput("down");
+    await panel.handleInput("enter");
+    assert.match(render(panel), /Mode/);
+    assert.match(render(panel), /Doctor/);
+    await panel.handleInput("escape");
+    await panel.drain();
+    await panel.handleInput("up");
+    await panel.handleInput("up");
+    await panel.handleInput("enter");
+    await panel.handleInput("enter");
+    await panel.drain();
+    assert.match(render(panel), /Explain selection completed\./);
+    assert.equal(messages.at(-1).customType, name);
+    await panel.close();
+  });
+  await command.handler("", dashboardTui);
+
+  interactions.push(async (panel) => {
+    assert.match(render(panel), /Current mode: Automatic/);
+    for (let i = 0; i < 3; i++) await panel.handleInput("down");
+    await panel.handleInput("enter");
+    assert.match(render(panel), /Mode/);
+    assert.match(render(panel), /Doctor/);
+    await panel.handleInput("enter");
+    assert.match(render(panel), /Automatic/);
+    assert.match(render(panel), /Observe/);
+    await panel.handleInput("down");
+    await panel.handleInput("enter");
+    await panel.drain();
+    assert.match(render(panel), /Draft mode: Observe/);
+    const savedBeforeFailure = await readFile(configPath, "utf8");
+    assert.equal(JSON.parse(savedBeforeFailure).mode, "auto");
+    await rm(configPath, { force: true });
+    await mkdir(configPath);
+    await panel.handleInput("\u0013");
+    await waitFor(
+      () => render(panel).includes("Could not save mode. Draft preserved"),
+      "failed config write should preserve the mode draft",
+    );
+    assert.match(render(panel), /Current mode: Automatic/);
+    assert.match(render(panel), /Draft mode: Observe/);
+    await rm(configPath, { recursive: true, force: true });
+    await writeFile(configPath, savedBeforeFailure);
+    await panel.handleInput("\u0013");
+    await panel.drain();
+    assert.match(render(panel), /Saved mode: Observe/);
+    const saved = JSON.parse(await readFile(configPath, "utf8"));
+    assert.equal(saved.mode, "observe");
+    assert.equal(saved.enabled, true);
+    await panel.close();
+  });
+  await command.handler("config", dashboardTui);
+
+  interactions.push(async (panel) => {
+    for (let i = 0; i < 3; i++) await panel.handleInput("down");
+    await panel.handleInput("enter");
+    await panel.handleInput("enter");
+    await panel.handleInput("down");
+    await panel.handleInput("enter");
+    await panel.drain();
+    assert.match(render(panel), /Draft mode: Off/);
+    assert.equal(JSON.parse(await readFile(configPath, "utf8")).mode, "observe");
+    await panel.handleInput("escape");
+    assert.match(render(panel), /Unsaved changes/);
+    await panel.handleInput("escape");
+    assert.equal(JSON.parse(await readFile(configPath, "utf8")).mode, "observe");
+  });
+  await command.handler("", dashboardTui);
+
+  interactions.push(async (panel) => {
+    for (let i = 0; i < 3; i++) await panel.handleInput("down");
+    await panel.handleInput("enter");
+    await panel.handleInput("down");
+    await panel.handleInput("enter");
+    await panel.drain();
+    assert.match(render(panel), /Doctor completed\./);
+    assert.match(messages.at(-1).content, /storage/);
+    await panel.close();
+  });
+  await command.handler("", dashboardTui);
 
   const priorMessages = messages.length;
-  await command.handler("", { ...tui, ui: { select: async () => undefined } });
+  interactions.push(async (panel) => {
+    await panel.close();
+  });
+  await command.handler("", dashboardTui);
+
+  projectTrusted = true;
+  const openLanguageChoices = async (panel) => {
+    for (let i = 0; i < 3; i++) await panel.handleInput("down");
+    await panel.handleInput("enter");
+    await panel.handleInput("down");
+    await panel.handleInput("down");
+    await panel.handleInput("enter");
+  };
+  const projectLocalePath = join(cwd, ".pi", "pi-autoskills.locale.json");
+  interactions.push(async (panel) => {
+    assert.match(render(panel), /Current language: English/);
+    await openLanguageChoices(panel);
+    assert.match(render(panel), /English/);
+    assert.match(render(panel), /Português \(Brasil\)/);
+    await panel.handleInput("down");
+    await panel.handleInput("enter");
+    await panel.drain();
+    assert.match(render(panel), /Rascunho do idioma: Português \(Brasil\)/);
+    for (const width of [40, 80, 120])
+      assert.ok(panel.render(width).every((line) => visibleWidth(line) === width));
+    assert.match(render(panel), /Ativas/);
+    assert.match(render(panel), /Configurações/);
+    assert.match(render(panel), /↑↓ navegar/);
+    await panel.handleInput("enter");
+    assert.match(render(panel), /Modo/);
+    assert.match(render(panel), /Diagnóstico/);
+    assert.match(render(panel), /Idioma/);
+    await panel.handleInput("escape");
+    await panel.drain();
+    for (let i = 0; i < 3; i++) await panel.handleInput("up");
+    await panel.handleInput("enter");
+    assert.match(render(panel), /Exibir skills selecionadas/);
+    await panel.handleInput("escape");
+    await panel.drain();
+    await assert.rejects(readFile(projectLocalePath, "utf8"), { code: "ENOENT" });
+    await panel.handleInput("escape");
+    assert.match(render(panel), /Há alterações sem salvar/);
+    assert.match(render(panel), /Rascunho do idioma: Português \(Brasil\)/);
+    await panel.handleInput("escape");
+    await assert.rejects(readFile(projectLocalePath, "utf8"), { code: "ENOENT" });
+  });
+  await command.handler("", dashboardTui);
+
+  interactions.push(async (panel) => {
+    assert.match(render(panel), /Current language: English/);
+    await openLanguageChoices(panel);
+    await panel.handleInput("down");
+    await panel.handleInput("enter");
+    await panel.drain();
+    assert.match(render(panel), /Rascunho do idioma: Português \(Brasil\)/);
+    await panel.handleInput("\u0013");
+    await waitFor(
+      () => render(panel).includes("Idioma salvo para este projeto."),
+      "Ctrl+S should persist the trusted project's language preference",
+    );
+    await panel.drain();
+    assert.equal(JSON.parse(await readFile(projectLocalePath, "utf8")).locale, "pt-BR");
+    await panel.close();
+  });
+  await command.handler("", dashboardTui);
+
+  interactions.push(async (panel) => {
+    assert.match(render(panel), /Idioma atual: Português \(Brasil\)/);
+    assert.match(render(panel), /Configurações/);
+    await panel.close();
+  });
+  await command.handler("", dashboardTui);
+
+  const otherCwd = join(root, "other-project");
+  await mkdir(otherCwd);
+  interactions.push(async (panel) => {
+    assert.match(render(panel), /Current language: English/);
+    assert.match(render(panel), /Settings/);
+    await panel.close();
+  });
+  await command.handler("", { ...dashboardTui, cwd: otherCwd });
+
+  const untrustedCwd = join(root, "untrusted-project");
+  await mkdir(join(untrustedCwd, ".pi"), { recursive: true });
+  const untrustedLocalePath = join(untrustedCwd, ".pi", "pi-autoskills.locale.json");
+  await writeFile(untrustedLocalePath, JSON.stringify({ schemaVersion: 1, locale: "pt-BR" }));
+  const untrustedLocaleBefore = await readFile(untrustedLocalePath, "utf8");
+  projectTrusted = false;
+  interactions.push(async (panel) => {
+    assert.match(render(panel), /Current language: English/);
+    await openLanguageChoices(panel);
+    await panel.handleInput("down");
+    await panel.handleInput("enter");
+    await panel.drain();
+    assert.match(render(panel), /Rascunho do idioma: Português \(Brasil\)/);
+    await panel.handleInput("\u0013");
+    await waitFor(
+      () => render(panel).includes("Confie neste projeto antes de salvar a preferência de idioma."),
+      "untrusted projects must not save locale preferences",
+    );
+    assert.equal(await readFile(untrustedLocalePath, "utf8"), untrustedLocaleBefore);
+    assert.match(render(panel), /Rascunho do idioma: Português \(Brasil\)/);
+    await panel.close();
+  });
+  await command.handler("", { ...dashboardTui, cwd: untrustedCwd });
+
   assert.equal(messages.length, priorMessages);
+  assert.equal(closedPanels, 10);
+  assert.deepEqual([...commands.keys()], registeredCommandNames);
+  assert.deepEqual([...tools.keys()].sort(), registeredToolNames);
+  assert.ok(renderRequests > 0);
 });
