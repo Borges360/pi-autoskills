@@ -5,6 +5,8 @@ import { loadConfig, saveConfig } from "./config.js";
 import { FileStorage, SqliteStorage, } from "./storage.js";
 import { DurableStorage } from "./durable.js";
 import { Interop } from "./contracts.js";
+import { openSettingsPanel } from "../ui/settings-panel.js";
+import { loadProjectLocale, panelMessages, saveProjectLocale, translate, } from "./i18n.js";
 import { atomicWrite, canonical, digest, projectKey, redact, } from "./security.js";
 export const toolResult = (value) => ({
     content: [{ type: "text", text: JSON.stringify(redact(value)) }],
@@ -117,13 +119,16 @@ export class Host {
         this.queue = result.catch(() => { });
         return result;
     }
-    async configure(patch) {
-        this.config = await loadConfig(this.extension, this.cwd, this.trusted, {
+    async configure(patch, signal) {
+        signal?.throwIfAborted();
+        const nextConfig = await loadConfig(this.extension, this.cwd, this.trusted, {
             ...this.config,
             ...patch,
         });
-        await saveConfig(this.extension, this.config);
-        return this.config;
+        signal?.throwIfAborted();
+        await saveConfig(this.extension, nextConfig);
+        this.config = nextConfig;
+        return nextConfig;
     }
     async doctor() {
         const recovery = await this.store.recover();
@@ -150,7 +155,7 @@ export class Host {
         if (action === "config")
             return this.config;
         if (action === "off" || action === "auto" || action === "observe")
-            return this.configure({ enabled: action !== "off", mode: action });
+            return this.configure({ enabled: action !== "off", mode: action }, context.signal);
         if (action === "storage")
             return args[0] === "migrate"
                 ? this.migrate(args[1])
@@ -273,6 +278,17 @@ export function register(pi, extension, command, factory, tools = []) {
             const h = await get(ctx);
             let parts = args.trim().split(/\s+/).filter(Boolean);
             const interactive = ctx.mode === "tui" && ctx.hasUI;
+            const opensMenu = interactive &&
+                (!parts.length ||
+                    (parts.length === 1 && (parts[0] === "config" || parts[0] === "mode")));
+            const trustedProject = opensMenu ? ctx.isProjectTrusted() : false;
+            const localeState = opensMenu
+                ? await loadProjectLocale(ctx.cwd, trustedProject)
+                : { locale: "en", invalid: false };
+            let locale = localeState.locale;
+            let savedLocale = locale;
+            let draftLocale = locale;
+            const tr = (key, values) => translate(locale, key, values);
             const displayNames = {
                 longrun: "Longrun",
                 autoskills: "AutoSkills",
@@ -285,155 +301,97 @@ export function register(pi, extension, command, factory, tools = []) {
                 Actions: h.service.menu,
                 Settings: ["config", "doctor"],
             };
-            const options = [
-                {
-                    action: "auto",
-                    label: "Automatic",
-                    description: h.service.modeDescriptions?.auto ??
-                        "Allow eligible actions when this extension's policy permits.",
-                },
-                {
-                    action: "observe",
-                    label: "Observe",
-                    description: h.service.modeDescriptions?.observe ??
-                        "Show decisions without acting automatically.",
-                },
-                {
-                    action: "off",
-                    label: "Off",
-                    description: h.service.modeDescriptions?.off ??
-                        "Disable this extension's automatic behavior.",
-                },
-            ];
-            const formatKey = (key) => ({
-                enter: "Enter",
-                return: "Enter",
-                escape: "Esc",
-                "ctrl+c": "Ctrl+C",
-                up: "↑",
-                down: "↓",
-            })[key.toLowerCase()] ?? key.toUpperCase();
-            const keyText = (keys, fallback) => keys.map(formatKey).join(" / ") || fallback;
+            const modeActions = ["auto", "observe", "off"];
+            const modeLabel = (mode) => tr(`mode.${mode}`);
+            const groupKeys = {
+                Active: "group.active",
+                Suggestions: "group.suggestions",
+                Agents: "group.agents",
+                Settings: "group.settings",
+            };
+            const groupDescriptionKeys = {
+                Active: "groupDescription.active",
+                Suggestions: "groupDescription.suggestions",
+                Agents: "groupDescription.agents",
+                Settings: "groupDescription.settings",
+            };
+            const actionKeys = {
+                show: "action.show",
+                explain: "action.explain",
+                detect: "action.detect",
+                agents: "action.agents",
+                config: "action.config",
+                mode: "action.config",
+                doctor: "action.doctor",
+                language: "action.language",
+            };
+            const groupLabel = (group) => groupKeys[group] ? tr(groupKeys[group]) : group;
+            const actionLabel = (action) => actionKeys[action] ? tr(actionKeys[action]) : action;
+            const actionCount = (count) => count === 1
+                ? tr("menu.oneAction")
+                : tr("menu.actionCount", { count });
             const currentMode = () => !h.config.enabled || h.config.mode === "off"
                 ? "off"
                 : h.config.mode === "observe"
                     ? "observe"
                     : "auto";
-            const showModePanel = async () => {
-                let activeAction = currentMode();
-                let selectedIndex = options.findIndex((option) => option.action === activeAction);
-                let status = "";
-                await ctx.ui.custom((tui, theme, keybindings, done) => {
-                    let saving = false;
-                    const confirmKeys = keyText(keybindings.getKeys("tui.select.confirm"), "Enter");
-                    const cancelKeys = keyText(keybindings.getKeys("tui.select.cancel"), "Esc");
-                    const upKeys = keyText(keybindings.getKeys("tui.select.up"), "↑");
-                    const downKeys = keyText(keybindings.getKeys("tui.select.down"), "↓");
-                    const fit = (line, width) => line.length <= width
-                        ? line
-                        : line.slice(0, Math.max(0, width - 1)) + "…";
-                    return {
-                        render(width) {
-                            const current = options.find((option) => option.action === activeAction) ??
-                                options[0];
-                            const selected = options[selectedIndex];
-                            const lines = [
-                                `${displayName} / Settings / Mode`,
-                                "",
-                                `Current mode: ${current.label}`,
-                                "",
-                                "Choose a mode",
-                                ...options.map((option, index) => `${index === selectedIndex ? "›" : " "} ${option.label}${option.action === activeAction ? "  (current)" : ""}`),
-                                "",
-                                selected.description,
-                                "",
-                                `${upKeys} / ${downKeys} Move    ${confirmKeys} Save    ${cancelKeys} Back`,
-                                status,
-                            ];
-                            return lines.map((line, index) => {
-                                const visible = fit(line, width).padEnd(width, " ");
-                                const selectedRow = index === 5 + selectedIndex;
-                                const foreground = index === 0 || index === 4 || selectedRow
-                                    ? theme.fg("accent", theme.bold(visible))
-                                    : theme.fg("toolOutput", visible);
-                                return theme.bg("toolPendingBg", foreground);
-                            });
-                        },
-                        invalidate() { },
-                        async handleInput(data) {
-                            if (keybindings.matches(data, "tui.select.cancel")) {
-                                done(undefined);
-                                return;
-                            }
-                            if (keybindings.matches(data, "tui.select.up")) {
-                                selectedIndex =
-                                    (selectedIndex + options.length - 1) % options.length;
-                                tui.requestRender();
-                                return;
-                            }
-                            if (keybindings.matches(data, "tui.select.down")) {
-                                selectedIndex = (selectedIndex + 1) % options.length;
-                                tui.requestRender();
-                                return;
-                            }
-                            if (saving || !keybindings.matches(data, "tui.select.confirm"))
-                                return;
-                            saving = true;
-                            try {
-                                const selected = options[selectedIndex];
-                                await h.serial(() => h.command(selected.action, [], {
-                                    cwd: ctx.cwd,
-                                    trusted: ctx.isProjectTrusted(),
-                                    hostContext: ctx,
-                                    commandContext: ctx,
-                                    signal: ctx.signal,
-                                }));
-                                activeAction = selected.action;
-                                status = `Saved: ${selected.label}.`;
-                            }
-                            catch {
-                                status = "Could not save the mode. Try again.";
-                            }
-                            finally {
-                                saving = false;
-                                tui.requestRender();
-                            }
-                        },
-                    };
-                }, {
-                    overlay: true,
-                    overlayOptions: {
-                        width: "72%",
-                        maxHeight: 15,
-                        anchor: "center",
-                        margin: 1,
-                    },
-                });
-            };
-            const runMenu = async (initialGroup) => {
-                let group = initialGroup;
-                while (true) {
-                    if (!group) {
-                        group = await ctx.ui.select(displayName, Object.keys(groups));
-                        if (!group)
+            let draftMode = currentMode();
+            const panelRows = Object.entries(groups).map(([group, actions]) => ({
+                id: `group:${group}`,
+                label: () => groupLabel(group),
+                value: () => {
+                    if (group !== "Settings")
+                        return actionCount(actions.length);
+                    const mode = draftMode === currentMode()
+                        ? `${tr("summary.currentMode")}: ${modeLabel(draftMode)}`
+                        : `${tr("summary.draftMode")}: ${modeLabel(draftMode)}`;
+                    const language = draftLocale === savedLocale
+                        ? `${tr("summary.currentLanguage")}: ${tr(draftLocale === "en" ? "locale.en" : "locale.ptBR")}`
+                        : `${tr("summary.draftLanguage")}: ${tr(draftLocale === "en" ? "locale.en" : "locale.ptBR")}`;
+                    return `${mode} · ${language}`;
+                },
+                description: () => groupDescriptionKeys[group]
+                    ? tr(groupDescriptionKeys[group])
+                    : actions.map(actionLabel).join(" · "),
+                activate: async (panel, signal) => {
+                    const menuActions = group === "Settings" ? [...actions, "language"] : actions;
+                    const selected = await panel.choose(`${displayName} / ${groupLabel(group)}`, menuActions.map((action) => ({
+                        value: action,
+                        label: actionLabel(action),
+                    })));
+                    if (!selected || signal.aborted)
+                        return;
+                    if (selected === "config" || selected === "mode") {
+                        const mode = await panel.choose(`${displayName} / ${groupLabel("Settings")} / ${tr("page.mode")}`, modeActions.map((action) => ({
+                            value: action,
+                            label: modeLabel(action),
+                        })), draftMode);
+                        if (mode && !signal.aborted) {
+                            draftMode = mode;
+                            panel.report(tr("notice.modeDraft", { mode: modeLabel(draftMode) }));
+                        }
+                        return;
+                    }
+                    if (selected === "language") {
+                        const selectedLocale = await panel.choose(`${displayName} / ${groupLabel("Settings")} / ${tr("page.language")}`, ["en", "pt-BR"].map((choice) => ({
+                            value: choice,
+                            label: tr(choice === "en" ? "locale.en" : "locale.ptBR"),
+                        })), draftLocale);
+                        if (!selectedLocale || signal.aborted)
                             return;
+                        draftLocale = selectedLocale;
+                        locale = draftLocale;
+                        panel.report(draftLocale === savedLocale
+                            ? tr("notice.localeDraftMatches")
+                            : tr("notice.localeDraftSelected"));
+                        return;
                     }
-                    const selected = await ctx.ui.select(`${displayName} / ${group}`, groups[group] ?? []);
-                    if (!selected) {
-                        group = undefined;
-                        continue;
-                    }
-                    let selectedParts = selected.split(/\s+/);
-                    const selectedAction = selectedParts[0] ?? "status";
-                    if (selectedAction === "config" || selectedAction === "mode") {
-                        await showModePanel();
-                        continue;
-                    }
+                    const selectedParts = selected.split(/\s+/);
                     const inputTitle = h.service.menuInputs?.[selected];
                     if (inputTitle) {
-                        const value = await ctx.ui.input(inputTitle);
-                        if (!value?.trim())
-                            continue;
+                        const value = await panel.input(inputTitle, "");
+                        if (!value?.trim() || signal.aborted)
+                            return;
                         selectedParts.push(value.trim());
                     }
                     const action = selectedParts.shift() ?? "status";
@@ -442,21 +400,91 @@ export function register(pi, extension, command, factory, tools = []) {
                         trusted: ctx.isProjectTrusted(),
                         hostContext: ctx,
                         commandContext: ctx,
-                        signal: ctx.signal,
+                        signal,
                     }));
+                    if (signal.aborted)
+                        return;
                     show(result);
-                }
+                    panel.report(tr("notice.actionCompleted", { action: actionLabel(action) }));
+                },
+            }));
+            const showSettingsPanel = async () => {
+                const signal = ctx.signal ?? new AbortController().signal;
+                await openSettingsPanel(ctx.ui, {
+                    title: displayName,
+                    messages: () => panelMessages(locale),
+                    initialStatus: localeState.invalid
+                        ? tr("notice.invalidLocale")
+                        : undefined,
+                    summary: () => {
+                        const current = currentMode();
+                        const modeSummary = draftMode === current
+                            ? `${tr("summary.currentMode")}: ${modeLabel(current)}`
+                            : `${tr("summary.currentMode")}: ${modeLabel(current)} · ${tr("summary.draftMode")}: ${modeLabel(draftMode)}`;
+                        return draftLocale === savedLocale
+                            ? `${modeSummary} · ${tr("summary.currentLanguage")}: ${tr(savedLocale === "en" ? "locale.en" : "locale.ptBR")}`
+                            : `${modeSummary} · ${tr("summary.draftLanguage")}: ${tr(draftLocale === "en" ? "locale.en" : "locale.ptBR")}`;
+                    },
+                    rows: panelRows,
+                    dirty: () => draftMode !== currentMode() || draftLocale !== savedLocale,
+                    signal,
+                    save: async (panel, saveSignal) => {
+                        const modeChanged = draftMode !== currentMode();
+                        const localeChanged = draftLocale !== savedLocale;
+                        if (!modeChanged && !localeChanged) {
+                            panel.report(tr("notice.noChanges"));
+                            return;
+                        }
+                        if (modeChanged) {
+                            try {
+                                await h.serial(() => h.configure({ enabled: draftMode !== "off", mode: draftMode }, saveSignal));
+                            }
+                            catch {
+                                throw new Error("mode-save-failed");
+                            }
+                        }
+                        if (localeChanged) {
+                            try {
+                                await saveProjectLocale(ctx.cwd, ctx.isProjectTrusted(), draftLocale, saveSignal);
+                                savedLocale = draftLocale;
+                            }
+                            catch (error) {
+                                if (modeChanged) {
+                                    panel.report(error.message === "trusted-project-required"
+                                        ? tr("notice.partialTrustSave")
+                                        : tr("notice.partialSave"));
+                                    return;
+                                }
+                                throw error;
+                            }
+                        }
+                        panel.report(localeChanged
+                            ? tr("notice.localeSaved")
+                            : tr("notice.modeSaved", { mode: modeLabel(draftMode) }));
+                    },
+                    formatError: (error) => {
+                        const reason = error.message;
+                        if (reason === "trusted-project-required")
+                            return tr("notice.trustedProjectRequired");
+                        if (reason === "operation-cancelled")
+                            return tr("panel.canceled");
+                        if (reason === "mode-save-failed")
+                            return tr("notice.modeSaveFailed");
+                        return draftLocale !== savedLocale
+                            ? tr("notice.localeSaveFailed")
+                            : tr("notice.modeSaveFailed");
+                    },
+                });
             };
             if (interactive && !parts.length) {
-                await runMenu();
+                await showSettingsPanel();
                 return;
             }
             let action = parts.shift() ?? "status";
             if (action === "mode")
                 action = "config";
             if (interactive && action === "config") {
-                await showModePanel();
-                await runMenu("Settings");
+                await showSettingsPanel();
                 return;
             }
             show(await h.serial(() => h.command(action, parts, {
