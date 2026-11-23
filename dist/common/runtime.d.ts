@@ -130,6 +130,14 @@ export declare class Host {
         backupPreserved: boolean;
     }>;
 }
-export declare function register(pi: ExtensionAPI, extension: string, command: string, factory: ServiceFactory, tools?: ToolDefinition[]): {
+/**
+ * Doctor report when the Host cannot start. It re-checks each startup step to name the cause and
+ * how to recover, and changes nothing: removing a storage pointer could reopen an older backend.
+ */
+export declare function diagnoseStartup(extension: string, cwd: string, trusted: boolean, error: unknown): Promise<Record<string, unknown>>;
+export declare function register(pi: ExtensionAPI, extension: string, command: string, factory: ServiceFactory, tools?: ToolDefinition[], options?: {
+    /** Menu groups shown when the service cannot start (storage failure). */
+    menuGroups?: Record<string, string[]>;
+}): {
     get: (ctx: ExtensionContext) => Promise<Host>;
 };

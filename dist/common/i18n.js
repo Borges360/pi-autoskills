@@ -44,6 +44,9 @@ const en = {
     "notice.invalidLocale": "Project language preference is invalid. English is active as fallback.",
     "notice.actionCompleted": "{action} completed.",
     "notice.actionFailed": "{action} failed. Try again.",
+    "notice.actionTimedOut": "{action} did not finish in time and was stopped. Try again, or run Doctor if it keeps happening.",
+    "notice.storageUnavailable": "{action} needs the project storage, which could not start. Run Doctor for the cause and recovery steps.",
+    "notice.storageUnavailableAtOpen": "Project storage could not start. Mode can still be saved; run Doctor for the cause and recovery steps.",
 };
 const ptBR = {
     "group.active": "Ativas",
@@ -86,6 +89,9 @@ const ptBR = {
     "notice.invalidLocale": "A preferência de idioma do projeto é inválida. O inglês está ativo como fallback.",
     "notice.actionCompleted": "{action} concluído.",
     "notice.actionFailed": "{action} falhou. Tente novamente.",
+    "notice.actionTimedOut": "{action} não terminou a tempo e foi interrompido. Tente novamente ou execute o Diagnóstico se continuar acontecendo.",
+    "notice.storageUnavailable": "{action} precisa do armazenamento do projeto, que não pôde ser iniciado. Execute o Diagnóstico para ver a causa e como recuperar.",
+    "notice.storageUnavailableAtOpen": "O armazenamento do projeto não pôde ser iniciado. O modo ainda pode ser salvo; execute o Diagnóstico para ver a causa e como recuperar.",
 };
 export const catalogs = { en, "pt-BR": ptBR };
 export const messageKeys = Object.keys(en);

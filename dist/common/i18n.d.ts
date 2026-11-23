@@ -41,6 +41,9 @@ declare const en: {
     readonly "notice.invalidLocale": "Project language preference is invalid. English is active as fallback.";
     readonly "notice.actionCompleted": "{action} completed.";
     readonly "notice.actionFailed": "{action} failed. Try again.";
+    readonly "notice.actionTimedOut": "{action} did not finish in time and was stopped. Try again, or run Doctor if it keeps happening.";
+    readonly "notice.storageUnavailable": "{action} needs the project storage, which could not start. Run Doctor for the cause and recovery steps.";
+    readonly "notice.storageUnavailableAtOpen": "Project storage could not start. Mode can still be saved; run Doctor for the cause and recovery steps.";
 };
 export declare const catalogs: {
     readonly en: {
@@ -84,6 +87,9 @@ export declare const catalogs: {
         readonly "notice.invalidLocale": "Project language preference is invalid. English is active as fallback.";
         readonly "notice.actionCompleted": "{action} completed.";
         readonly "notice.actionFailed": "{action} failed. Try again.";
+        readonly "notice.actionTimedOut": "{action} did not finish in time and was stopped. Try again, or run Doctor if it keeps happening.";
+        readonly "notice.storageUnavailable": "{action} needs the project storage, which could not start. Run Doctor for the cause and recovery steps.";
+        readonly "notice.storageUnavailableAtOpen": "Project storage could not start. Mode can still be saved; run Doctor for the cause and recovery steps.";
     };
     readonly "pt-BR": {
         "group.active": string;
@@ -126,6 +132,9 @@ export declare const catalogs: {
         "notice.invalidLocale": string;
         "notice.actionCompleted": string;
         "notice.actionFailed": string;
+        "notice.actionTimedOut": string;
+        "notice.storageUnavailable": string;
+        "notice.storageUnavailableAtOpen": string;
     };
 };
 export type MessageKey = keyof typeof en;

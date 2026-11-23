@@ -7,7 +7,7 @@ import type {
 import { mkdir, readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { hostname } from "node:os";
-import { loadConfig, saveConfig, type Config } from "./config.js";
+import { defaults, loadConfig, saveConfig, type Config } from "./config.js";
 import {
   FileStorage,
   SqliteStorage,
@@ -16,7 +16,7 @@ import {
 } from "./storage.js";
 import { DurableStorage } from "./durable.js";
 import { Interop, type EventBus } from "./contracts.js";
-import { openMenu, type Mode } from "../ui/menu.js";
+import { MenuError, openMenu, type Mode } from "../ui/menu.js";
 import { loadProjectLocale, saveProjectLocale } from "./i18n.js";
 import {
   atomicWrite,
@@ -24,6 +24,7 @@ import {
   digest,
   projectKey,
   redact,
+  redactText,
 } from "./security.js";
 
 export interface CommandContext {
@@ -310,6 +311,82 @@ export class Host {
     }
   }
 }
+const modeOf = (config: Config): Mode =>
+  !config.enabled || config.mode === "off"
+    ? "off"
+    : config.mode === "observe"
+      ? "observe"
+      : "auto";
+/**
+ * Doctor report when the Host cannot start. It re-checks each startup step to name the cause and
+ * how to recover, and changes nothing: removing a storage pointer could reopen an older backend.
+ */
+export async function diagnoseStartup(
+  extension: string,
+  cwd: string,
+  trusted: boolean,
+  error: unknown,
+) {
+  const report = (
+    reason: string,
+    recovery: string,
+    file?: string,
+  ): Record<string, unknown> => ({
+    extension,
+    version: "0.1.0",
+    node: process.versions.node,
+    storage: "unavailable",
+    startup: { ok: false, reason, ...(file ? { file } : {}), recovery },
+    standalone: true,
+  });
+  let config: Config;
+  try {
+    config = await loadConfig(extension, cwd, trusted);
+  } catch {
+    return report(
+      "config-unreadable",
+      `Fix or remove the user configuration (defaults apply when it is missing)${trusted ? ` or the project file .pi/${extension}.json` : ""}, then run Doctor again.`,
+      join(defaults(extension).storage.root, "config.json"),
+    );
+  }
+  let pointerFile: string | undefined;
+  try {
+    pointerFile = join(
+      config.storage.root,
+      "projects",
+      await projectKey(cwd),
+      "backend.json",
+    );
+    const pointer = JSON.parse(await readFile(pointerFile, "utf8"));
+    if (
+      !["files", "sqlite", "durable"].includes(pointer?.backend) ||
+      !/^migration-[a-zA-Z0-9-]+$/.test(pointer?.directory)
+    )
+      throw new Error("invalid-backend-pointer");
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT")
+      return report(
+        "storage-pointer-invalid",
+        "The storage pointer is unreadable. Restore it from a backup, or rewrite it as {\"schemaVersion\":1,\"backend\":\"files|sqlite|durable\",\"directory\":\"migration-...\"} naming the newest migration-* directory beside it. Do not delete it: the older backend would be opened instead.",
+        pointerFile,
+      );
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  if (message === "migration-in-progress")
+    return report(
+      "migration-in-progress",
+      "Another Pi process is migrating this project's storage. Wait for it to finish, then run Doctor again.",
+    );
+  if (message === "migration-owner-review-required")
+    return report(
+      "migration-owner-review-required",
+      "A storage migration started by another host or process did not finish. Review the migration-* directories before retrying; nothing was changed.",
+    );
+  return report(
+    "storage-start-failed",
+    `Storage could not open (${redactText(message).slice(0, 200)}). Check permissions and free space in the storage root, then run Doctor again.`,
+  );
+}
 const displayNames: Record<string, string> = {
   longrun: "Longrun",
   autoskills: "AutoSkills",
@@ -323,6 +400,10 @@ export function register(
   command: string,
   factory: ServiceFactory,
   tools: ToolDefinition[] = [],
+  options: {
+    /** Menu groups shown when the service cannot start (storage failure). */
+    menuGroups?: Record<string, string[]>;
+  } = {},
 ) {
   let host: Host | undefined;
   const get = async (ctx: ExtensionContext) => {
@@ -360,10 +441,102 @@ export function register(
     await host?.close();
     host = undefined;
   });
+  const commandContext = (
+    ctx: ExtensionCommandContext,
+    signal: AbortSignal | undefined,
+  ): CommandContext => ({
+    cwd: ctx.cwd,
+    trusted: ctx.isProjectTrusted(),
+    hostContext: ctx,
+    commandContext: ctx,
+    ...(signal ? { signal } : {}),
+  });
+  /** Doctor stays reachable when storage cannot start: it then explains the cause and recovery. */
+  const doctor = async (
+    ctx: ExtensionCommandContext,
+    signal: AbortSignal | undefined,
+  ) => {
+    let h: Host;
+    try {
+      h = await get(ctx);
+    } catch (error) {
+      return diagnoseStartup(extension, ctx.cwd, ctx.isProjectTrusted(), error);
+    }
+    return h.serial(() => h.command("doctor", [], commandContext(ctx, signal)));
+  };
+  const runMenu = async (ctx: ExtensionCommandContext) => {
+    const owner = menuOwner;
+    const signal = ctx.signal
+      ? AbortSignal.any([owner.signal, ctx.signal])
+      : owner.signal;
+    const trusted = ctx.isProjectTrusted();
+    const localeState = await loadProjectLocale(ctx.cwd, trusted);
+    // The menu never depends on a started Host: Mode and Doctor work while storage is broken.
+    let h: Host | undefined = await get(ctx).catch(() => undefined);
+    let fallback: Config | undefined = h
+      ? undefined
+      : await loadConfig(extension, ctx.cwd, trusted).catch(() => undefined);
+    if (signal.aborted) return;
+    const started = async () => {
+      try {
+        h = await get(ctx);
+        return h;
+      } catch (error) {
+        throw new MenuError("storage-unavailable", { cause: error });
+      }
+    };
+    const service = h?.service;
+    await openMenu({
+      ui: ctx.ui,
+      title: displayNames[command] ?? extension,
+      groups: service
+        ? (service.menuGroups ?? {
+            Actions: service.menu,
+            Settings: ["config", "doctor"],
+          })
+        : (options.menuGroups ?? { Settings: ["config", "doctor"] }),
+      trusted,
+      locale: localeState.locale,
+      invalidLocale: localeState.invalid,
+      storageUnavailable: !h,
+      signal,
+      mode: () => modeOf(h?.config ?? fallback ?? defaults(extension)),
+      saveMode: async (mode, s) => {
+        const patch = { enabled: mode !== "off", mode } as const;
+        const live = await get(ctx).catch(() => undefined);
+        if (live) {
+          h = live;
+          await live.serial(() => live.configure(patch, s));
+          return;
+        }
+        // Storage is down; the mode lives in the user configuration, which does not need it.
+        s?.throwIfAborted();
+        const next = await loadConfig(extension, ctx.cwd, trusted, patch);
+        s?.throwIfAborted();
+        await saveConfig(extension, next);
+        fallback = next;
+      },
+      saveLocale: (locale, s) =>
+        saveProjectLocale(ctx.cwd, ctx.isProjectTrusted(), locale, s),
+      readStored: async (s) => {
+        const stored = await loadConfig(extension, ctx.cwd, trusted);
+        s.throwIfAborted();
+        const locale = await loadProjectLocale(ctx.cwd, trusted);
+        return { mode: modeOf(stored), locale: locale.locale };
+      },
+      run: async (action, s) => {
+        if (action === "doctor") return doctor(ctx, s);
+        const live = await started();
+        return live.serial(() =>
+          live.command(action, [], commandContext(ctx, s)),
+        );
+      },
+      show,
+    });
+  };
   pi.registerCommand(command, {
     description: `${extension}: status, explain, config, doctor`,
     handler: async (args, ctx) => {
-      const h = await get(ctx);
       const parts = args.trim().split(/\s+/).filter(Boolean);
       const interactive = ctx.mode === "tui" && ctx.hasUI;
       const opensMenu =
@@ -371,71 +544,22 @@ export function register(
         (!parts.length ||
           (parts.length === 1 && (parts[0] === "config" || parts[0] === "mode")));
       if (opensMenu) {
-        // One menu at a time; a second /autoskills while it is open does nothing.
+        // One menu at a time: the slot is claimed before any await, so a second /autoskills
+        // while it is opening or open does nothing, and shutdown always waits for this one.
         if (menu) return;
-        const owner = menuOwner;
-        const signal = ctx.signal
-          ? AbortSignal.any([owner.signal, ctx.signal])
-          : owner.signal;
-        const commandContext = (s: AbortSignal): CommandContext => ({
-          cwd: ctx.cwd,
-          trusted: ctx.isProjectTrusted(),
-          hostContext: ctx,
-          commandContext: ctx,
-          signal: s,
+        const mine: Promise<void> = runMenu(ctx).finally(() => {
+          if (menu === mine) menu = undefined;
         });
-        const trusted = ctx.isProjectTrusted();
-        const localeState = await loadProjectLocale(ctx.cwd, trusted);
-        const currentMode = (): Mode =>
-          !h.config.enabled || h.config.mode === "off"
-            ? "off"
-            : h.config.mode === "observe"
-              ? "observe"
-              : "auto";
-        menu = openMenu({
-          ui: ctx.ui,
-          title: displayNames[command] ?? extension,
-          groups: h.service.menuGroups ?? {
-            Actions: h.service.menu,
-            Settings: ["config", "doctor"],
-          },
-          trusted,
-          locale: localeState.locale,
-          invalidLocale: localeState.invalid,
-          signal,
-          mode: currentMode,
-          saveMode: async (mode, s) => {
-            await h.serial(() =>
-              h.configure({ enabled: mode !== "off", mode }, s),
-            );
-          },
-          saveLocale: (locale, s) =>
-            saveProjectLocale(ctx.cwd, ctx.isProjectTrusted(), locale, s),
-          readStored: async (s) => {
-            const stored = await loadConfig(extension, ctx.cwd, trusted);
-            s.throwIfAborted();
-            const locale = await loadProjectLocale(ctx.cwd, trusted);
-            return {
-              mode:
-                !stored.enabled || stored.mode === "off"
-                  ? "off"
-                  : stored.mode === "observe"
-                    ? "observe"
-                    : "auto",
-              locale: locale.locale,
-            };
-          },
-          run: (action, s) =>
-            h.serial(() => h.command(action, [], commandContext(s))),
-          show,
-        }).finally(() => {
-          menu = undefined;
-        });
-        await menu;
-        return;
+        menu = mine;
+        return mine;
       }
       let action = parts.shift() ?? "status";
       if (action === "mode") action = "config";
+      if (action === "doctor") {
+        show(await doctor(ctx, ctx.signal));
+        return;
+      }
+      const h = await get(ctx);
       show(
         await h.serial(() =>
           h.command(action, parts, {

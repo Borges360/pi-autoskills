@@ -29,6 +29,8 @@ export interface MenuOptions {
   locale: Locale;
   /** The saved language file exists but is invalid (English is the fallback). */
   invalidLocale?: boolean;
+  /** Project storage could not start: the menu still opens; Mode and Doctor keep working. */
+  storageUnavailable?: boolean;
   /** Owner signal: session shutdown or reload closes the menu. */
   signal: AbortSignal;
   /** Effective mode right now. */
@@ -69,8 +71,14 @@ const actionDescriptionKeys: Record<string, MessageKey> = {
   agents: "actionDescription.agents",
   doctor: "actionDescription.doctor",
 };
-/** Doctor runs storage recovery; the read-only listings use the adapter default (30 s). */
+/** Doctor runs storage recovery; the read-only listings get 30 s. */
 const actionTimeouts: Record<string, number> = { doctor: 120_000 };
+const DEFAULT_ACTION_TIMEOUT = 30_000;
+/**
+ * The menu's own deadline fires first and reports "did not finish in time"; the adapter timeout
+ * is only a backstop (it would report a user cancel, which nobody asked for).
+ */
+const ADAPTER_TIMEOUT_MARGIN = 5_000;
 
 /** Rejects with the signal's reason as soon as it aborts, without waiting for `work`. */
 function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
@@ -98,7 +106,9 @@ export class MenuError extends Error {
     readonly reason:
       | "trusted-project-required"
       | "mode-save-failed"
-      | "locale-save-failed",
+      | "locale-save-failed"
+      | "action-timed-out"
+      | "storage-unavailable",
     options?: ErrorOptions,
   ) {
     super(reason, options);
@@ -175,13 +185,24 @@ export async function openMenu(o: MenuOptions): Promise<void> {
             ...(actionDescriptionKeys[id]
               ? { description: tr(actionDescriptionKeys[id]!) }
               : {}),
-            timeoutMs: actionTimeouts[id] ?? 30_000,
+            timeoutMs:
+              (actionTimeouts[id] ?? DEFAULT_ACTION_TIMEOUT) + ADAPTER_TIMEOUT_MARGIN,
             run: async (_draft, signal) => {
               // Read-only: Esc stops waiting at once; a result that arrives later never reaches
               // the chat, and the menu still waits for the work before it returns.
-              const result = await untilAborted(track(o.run(id, signal)), signal);
-              o.show(result);
-              return tr("notice.actionCompleted", { action: label });
+              const deadline = new AbortController();
+              const timer = setTimeout(
+                () => deadline.abort(new MenuError("action-timed-out")),
+                actionTimeouts[id] ?? DEFAULT_ACTION_TIMEOUT,
+              );
+              const stop = AbortSignal.any([signal, deadline.signal]);
+              try {
+                const result = await untilAborted(track(o.run(id, stop)), stop);
+                o.show(result);
+                return tr("notice.actionCompleted", { action: label });
+              } finally {
+                clearTimeout(timer);
+              }
             },
           };
         }),
@@ -218,8 +239,15 @@ export async function openMenu(o: MenuOptions): Promise<void> {
       if (reason === "locale-save-failed") return tr("notice.localeSaveFailed");
       return tr("notice.modeSaveFailed");
     }
-    if (context.phase === "action")
-      return tr("notice.actionFailed", { action: context.label ?? "" });
+    if (context.phase === "action") {
+      const action = context.label ?? "";
+      const reason = error instanceof MenuError ? error.reason : undefined;
+      if (reason === "action-timed-out")
+        return tr("notice.actionTimedOut", { action });
+      if (reason === "storage-unavailable")
+        return tr("notice.storageUnavailable", { action });
+      return tr("notice.actionFailed", { action });
+    }
     return undefined;
   };
 
@@ -228,7 +256,11 @@ export async function openMenu(o: MenuOptions): Promise<void> {
     locale,
     messages: messages(initial, initial),
   });
-  if (o.invalidLocale) session.setStatus(tr("notice.invalidLocale"), "warning");
+  const warnings = [
+    ...(o.storageUnavailable ? [tr("notice.storageUnavailableAtOpen")] : []),
+    ...(o.invalidLocale ? [tr("notice.invalidLocale")] : []),
+  ];
+  if (warnings.length) session.setStatus(warnings.join(" "), "warning");
   let panel: PanelController | undefined;
 
   const save = async (values: Readonly<Values>, signal: AbortSignal) => {

@@ -15,6 +15,8 @@ export interface MenuOptions {
     locale: Locale;
     /** The saved language file exists but is invalid (English is the fallback). */
     invalidLocale?: boolean;
+    /** Project storage could not start: the menu still opens; Mode and Doctor keep working. */
+    storageUnavailable?: boolean;
     /** Owner signal: session shutdown or reload closes the menu. */
     signal: AbortSignal;
     /** Effective mode right now. */
@@ -33,8 +35,8 @@ export interface MenuOptions {
 }
 /** Stable product error codes; formatError turns them into translated cause + recovery text. */
 export declare class MenuError extends Error {
-    readonly reason: "trusted-project-required" | "mode-save-failed" | "locale-save-failed";
-    constructor(reason: "trusted-project-required" | "mode-save-failed" | "locale-save-failed", options?: ErrorOptions);
+    readonly reason: "trusted-project-required" | "mode-save-failed" | "locale-save-failed" | "action-timed-out" | "storage-unavailable";
+    constructor(reason: "trusted-project-required" | "mode-save-failed" | "locale-save-failed" | "action-timed-out" | "storage-unavailable", options?: ErrorOptions);
 }
 /**
  * The /autoskills menu: one panel with the Mode and Language fields (Settings, drafts saved with

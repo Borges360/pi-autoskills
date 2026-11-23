@@ -1,8 +1,10 @@
 import { Type } from "typebox";
 import { register, toolResult } from "./common/runtime.js";
-import { createService } from "./skills.js";
+import { createService, autoSkillsMenuGroups } from "./skills.js";
 export default function (pi) {
-    const runtime = register(pi, "pi-autoskills", "autoskills", createService);
+    const runtime = register(pi, "pi-autoskills", "autoskills", createService, [], {
+        menuGroups: autoSkillsMenuGroups,
+    });
     pi.registerTool({
         name: "autoskills_select",
         label: "Select skills",

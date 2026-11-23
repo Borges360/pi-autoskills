@@ -20,6 +20,8 @@ export interface TaskSignals {
     kind?: string;
 }
 export declare function selectSkills(task: TaskSignals, catalog: SkillMetadata[], maxActive?: number, minScore?: number, pins?: string[]): SkillDecision;
+/** Menu action groups in display order; the menu also uses them when storage cannot start. */
+export declare const autoSkillsMenuGroups: Record<string, string[]>;
 export declare class AutoSkills implements Service {
     readonly host: Host;
     modeDescriptions: {
@@ -27,12 +29,7 @@ export declare class AutoSkills implements Service {
         observe: string;
         off: string;
     };
-    menuGroups: {
-        Active: string[];
-        Suggestions: string[];
-        Agents: string[];
-        Settings: string[];
-    };
+    menuGroups: Record<string, string[]>;
     capabilities: string[];
     menu: string[];
     catalog: SkillMetadata[];

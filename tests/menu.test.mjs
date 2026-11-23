@@ -16,6 +16,9 @@ const GROUPS = {
 };
 const plain = { fg: (_color, text) => text, bold: (text) => text };
 const tick = () => new Promise((resolve) => setImmediate(resolve));
+const ticks = async (n = 10) => {
+  for (let i = 0; i < n; i++) await tick();
+};
 const deferred = () => {
   let resolve, reject;
   const promise = new Promise((a, b) => {
@@ -271,6 +274,82 @@ test("Esc cancels a running action; its late result never reaches the chat; the 
   await f.keys(KEY.enter, KEY.down, KEY.enter);
   assert.match(f.screen(), /AutoSkills \*/);
   await f.keys(KEY.esc, KEY.esc);
+  await f.task;
+});
+
+test("an action that runs past its deadline reports a timeout, not a cancel, in en and pt-BR", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  for (const [locale, timedOut, cancelled] of [
+    ["en", /Show selected skills did not finish in time and was stopped\. Try again, or run Doctor/, /Operation cancelled/],
+    ["pt-BR", /Exibir skills selecionadas não terminou a tempo e foi interrompido\. Tente novamente ou execute o Diagnóstico/, /Operação cancelada/],
+  ]) {
+    const late = deferred();
+    let seen;
+    const f = fixture({
+      locale,
+      options: {
+        run: (action, signal) => {
+          seen = signal;
+          f.calls.run.push(action);
+          return late.promise;
+        },
+      },
+    });
+    await tick();
+    await f.goto("show");
+    f.panel().handleInput(KEY.enter);
+    // drain() waits for the running action, so only plain ticks while it is in flight.
+    await ticks();
+    t.mock.timers.tick(29_999);
+    await ticks();
+    assert.equal(seen.aborted, false);
+    t.mock.timers.tick(1);
+    await f.settle();
+    // No key was pressed: the work is told to stop and the panel names the timeout.
+    assert.equal(seen.aborted, true);
+    assert.match(f.screen(120), timedOut);
+    assert.doesNotMatch(f.screen(120), cancelled);
+    late.resolve({ late: true });
+    await f.settle();
+    assert.deepEqual(f.calls.show, []);
+    await f.key(KEY.esc);
+    await f.task;
+  }
+  // Doctor keeps its longer deadline.
+  const f = fixture({
+    options: { run: (_action, signal) => new Promise((_, reject) => signal.addEventListener("abort", () => reject(signal.reason))) },
+  });
+  await tick();
+  await f.goto("doctor");
+  f.panel().handleInput(KEY.enter);
+  await ticks();
+  t.mock.timers.tick(60_000);
+  await ticks();
+  assert.doesNotMatch(f.screen(120), /did not finish in time/);
+  t.mock.timers.tick(60_000);
+  await f.settle();
+  assert.match(f.screen(120), /Doctor did not finish in time/);
+  await f.key(KEY.esc);
+  await f.task;
+});
+
+test("storage failures in actions and at open show recovery text", async () => {
+  const { MenuError } = await import("../dist/ui/menu.js");
+  const f = fixture({
+    options: {
+      storageUnavailable: true,
+      run: async () => {
+        throw new MenuError("storage-unavailable", { cause: new Error("EACCES /secret") });
+      },
+    },
+  });
+  await tick();
+  assert.match(f.screen(120), /Project storage could not start\. Mode can still be saved; run Doctor/);
+  await f.goto("agents");
+  await f.key(KEY.enter);
+  assert.match(f.screen(120), /Agents needs the project storage, which could not start\. Run Doctor/);
+  assert.doesNotMatch(f.screen(120), /EACCES|secret/);
+  await f.key(KEY.esc);
   await f.task;
 });
 
