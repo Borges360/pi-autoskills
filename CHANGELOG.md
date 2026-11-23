@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Open source
+
+- Added `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, issue and pull request templates; `SECURITY.md` now explains private vulnerability reporting.
+- README reorganized with the same sections in English and Brazilian Portuguese.
+- `package.json` declares `bugs` and `homepage`.
+
 ### Menu
 
 - `/autoskills` (and `/autoskills config` in the TUI) opens a single settings panel built on a vendored Pi settings adapter (`src/vendor/`, hash-verified, no local patches). It opens without running any command.

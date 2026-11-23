@@ -2,8 +2,16 @@
   "name": "@borges360/pi-autoskills",
   "version": "0.1.2",
   "description": "pi-autoskills — independent, evidence-driven Pi extension",
-  "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Borges360/pi-autoskills.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Borges360/pi-autoskills/issues"
+  },
+  "homepage": "https://github.com/Borges360/pi-autoskills#readme",
+  "type": "module",
   "engines": {
     "node": ">=22.19.0"
   },
@@ -11,10 +19,6 @@
     "pi-package",
     "pi-extension"
   ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Borges360/pi-autoskills.git"
-  },
   "pi": {
     "extensions": [
       "./src/extension.ts"
