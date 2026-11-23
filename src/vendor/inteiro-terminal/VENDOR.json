@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "package": "@inteiro/terminal",
+  "version": "1.4.0",
+  "contract": "1.0.0",
+  "format": "ts",
+  "entry": "pi.ts",
+  "source": {
+    "repository": "https://github.com/Borges360/ids.git",
+    "path": "packages/terminal/src",
+    "commit": "67d70e81d6872aaea75d81e2d670fc0552a8ea32",
+    "packageCommit": "67d70e81d6872aaea75d81e2d670fc0552a8ea32",
+    "date": "2026-11-23T16:33:19.000Z",
+    "dirty": false
+  },
+  "externals": [
+    "@earendil-works/pi-tui"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-tui": "^1.5.2"
+  },
+  "hash": "sha256 of UTF-8 text with CRLF normalized to LF",
+  "requires": "TypeScript consumers: allowImportingTsExtensions or rewriteRelativeImportExtensions",
+  "files": [
+    {
+      "path": "components.ts",
+      "upstream": "packages/terminal/src/components.ts",
+      "upstreamSha256": "eda40c404dc36ece56689399856d079a5ac4b6e0335ce2310ecfd49c376e11f4",
+      "sha256": "eda40c404dc36ece56689399856d079a5ac4b6e0335ce2310ecfd49c376e11f4"
+    },
+    {
+      "path": "contracts.ts",
+      "upstream": "packages/terminal/src/contracts.ts",
+      "upstreamSha256": "d4f1a3769fcda5c716b70efcecb05ab81c0f5f132d11fd6e66a46daa1a536689",
+      "sha256": "d4f1a3769fcda5c716b70efcecb05ab81c0f5f132d11fd6e66a46daa1a536689"
+    },
+    {
+      "path": "controller.ts",
+      "upstream": "packages/terminal/src/controller.ts",
+      "upstreamSha256": "ec44988b7026addcfc2a0502ef841a8b41429308ed1f85d3d15cd18b4c201800",
+      "sha256": "ec44988b7026addcfc2a0502ef841a8b41429308ed1f85d3d15cd18b4c201800"
+    },
+    {
+      "path": "errors.ts",
+      "upstream": "packages/terminal/src/errors.ts",
+      "upstreamSha256": "5290b8d79349adfce11704012a6a90e2a2d63d2a7cace5799e3bc078d7d286b1",
+      "sha256": "5290b8d79349adfce11704012a6a90e2a2d63d2a7cace5799e3bc078d7d286b1"
+    },
+    {
+      "path": "i18n.ts",
+      "upstream": "packages/terminal/src/i18n.ts",
+      "upstreamSha256": "0fd5287b22aeaa49782a77bbf4432adf226fc132c9325a2e11a4e124f41a89f4",
+      "sha256": "0fd5287b22aeaa49782a77bbf4432adf226fc132c9325a2e11a4e124f41a89f4"
+    },
+    {
+      "path": "keyboard.ts",
+      "upstream": "packages/terminal/src/keyboard.ts",
+      "upstreamSha256": "b4e2f655ba44b0c12d045652a0b1283ed30cfaeb5b8c4161b746df924aadd283",
+      "sha256": "b4e2f655ba44b0c12d045652a0b1283ed30cfaeb5b8c4161b746df924aadd283"
+    },
+    {
+      "path": "navigation.ts",
+      "upstream": "packages/terminal/src/navigation.ts",
+      "upstreamSha256": "ad423e953e3d5162bd4c20de8cbeb454eea2d6bf940740f484b83748eb8172fa",
+      "sha256": "ad423e953e3d5162bd4c20de8cbeb454eea2d6bf940740f484b83748eb8172fa"
+    },
+    {
+      "path": "operation.ts",
+      "upstream": "packages/terminal/src/operation.ts",
+      "upstreamSha256": "c1f4312dae0af6551f8744c2b3898f371979a646d27493cb9172491ce167eaf7",
+      "sha256": "c1f4312dae0af6551f8744c2b3898f371979a646d27493cb9172491ce167eaf7"
+    },
+    {
+      "path": "pi.ts",
+      "upstream": "packages/terminal/src/pi.ts",
+      "upstreamSha256": "e8a29451d9d528530e31ed36719331f68265e5c484cb96ab84c729f19a0bc0ab",
+      "sha256": "e8a29451d9d528530e31ed36719331f68265e5c484cb96ab84c729f19a0bc0ab"
+    },
+    {
+      "path": "settings.ts",
+      "upstream": "packages/terminal/src/settings.ts",
+      "upstreamSha256": "904e5971d3001e7ee057b3ea5825d223e84c72942b0c1194e573e9209236fbf8",
+      "sha256": "904e5971d3001e7ee057b3ea5825d223e84c72942b0c1194e573e9209236fbf8"
+    },
+    {
+      "path": "text.ts",
+      "upstream": "packages/terminal/src/text.ts",
+      "upstreamSha256": "2d5270f93a82241b4c3c8e353d8abcdf8d5ab28e2d7a1cf0cf59006ab37b3573",
+      "sha256": "2d5270f93a82241b4c3c8e353d8abcdf8d5ab28e2d7a1cf0cf59006ab37b3573"
+    },
+    {
+      "path": "workspace.ts",
+      "upstream": "packages/terminal/src/workspace.ts",
+      "upstreamSha256": "a26416266beff01f1af2bd9488058173689d62d0c511c06e47636a619e77ad28",
+      "sha256": "a26416266beff01f1af2bd9488058173689d62d0c511c06e47636a619e77ad28"
+    }
+  ],
+  "license": {
+    "path": "LICENSE",
+    "upstream": "LICENSE",
+    "sha256": "64a1a05ea1ab22322c91208569361752ba3bc5a7896b2d0d16f811269d5ca6bb"
+  },
+  "verifier": {
+    "path": "verify-vendor.mjs",
+    "sha256": "0580a2e484cef3f3d79af4a21d8556b7a6d065c78e697346acd02af1f67cfcfb"
+  },
+  "patches": [],
+  "verify": "node verify-vendor.mjs",
+  "update": "node scripts/vendor-terminal.mjs --out <dir> --format ts  (in the IDS repository)"
+}
