@@ -53,7 +53,8 @@
     "benchmark": "npm run build && node benchmarks/run.mjs",
     "prepack": "npm run build",
     "format": "prettier --write src tests benchmarks *.md",
-    "schemas": "npm run build && node scripts/generate-schema.mjs"
+    "schemas": "npm run build && node scripts/generate-schema.mjs",
+    "smoke:host": "node scripts/smoke-pi-host.mjs"
   },
   "dependencies": {
     "yaml": "2.9.0",

@@ -12,8 +12,8 @@ export interface CommandContext {
 export interface Service {
     capabilities: string[];
     menu: string[];
+    /** Menu action groups in display order; `config`/`mode` become the Mode field of the panel. */
     menuGroups?: Record<string, string[]>;
-    menuInputs?: Record<string, string>;
     modeDescriptions?: Partial<Record<"auto" | "observe" | "off", string>>;
     command(action: string, args: string[], context: CommandContext): Promise<unknown>;
     start?(): Promise<void>;
