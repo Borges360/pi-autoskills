@@ -41,3 +41,34 @@ test("package peer range covers the vendored adapter and the installed host", as
   assert.equal(pkg.devDependencies["@earendil-works/pi-coding-agent"], "1.6.0");
   assert.ok(!("string-width" in (pkg.dependencies ?? {})));
 });
+
+test("no design-system mark, slogan or attribution ships outside the vendored adapter", async () => {
+  const pkg = JSON.parse(await readFile(new URL("package.json", root), "utf8"));
+  const walk = async (rel) => {
+    let entries;
+    try {
+      entries = await readdir(new URL(rel, root), { withFileTypes: true });
+    } catch (error) {
+      if (error.code === "ENOTDIR") return [rel];
+      if (error.code === "ENOENT") return [];
+      throw error;
+    }
+    return (
+      await Promise.all(entries.map((e) => (e.isDirectory() ? walk(`${rel}/${e.name}`) : [`${rel}/${e.name}`])))
+    ).flat();
+  };
+  const shipped = (await Promise.all(pkg.files.filter((p) => !p.startsWith("!")).map(walk)))
+    .flat()
+    .filter((path) => !/(^|\/)vendor(\/|$)/.test(path));
+  assert.ok(shipped.includes("README.md") && shipped.some((p) => p.startsWith("dist/")));
+  for (const path of shipped) {
+    assert.doesNotMatch(path, /inteiro|mark\.svg/i, `${path} ships a design-system asset`);
+    const text = await readFile(new URL(path, root), "utf8");
+    assert.doesNotMatch(text, /INTEIRO|Não eliminar a tensão/, `${path} carries the design-system mark or slogan`);
+  }
+});
+
+test("consumer README does not advertise the design system or its mark", async () => {
+  const readme = await readFile(new URL("README.md", root), "utf8");
+  assert.doesNotMatch(readme, /inteiro/i);
+});

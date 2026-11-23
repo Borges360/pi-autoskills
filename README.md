@@ -4,7 +4,7 @@
 
 **Status:** development release. Git source is documented below. npm registry availability and publication have not been verified; package metadata does not establish registry availability.
 
-**Compatibility:** Node.js `>=22.19`. The package uses Pi extension APIs; its declared coding-agent SDK is `1.2.0`, and an offline host smoke handled `/autoskills status` on Pi `1.4.0`. This does not establish a wider compatibility range.
+**Compatibility:** Node.js `>=22.19`. The package uses Pi extension APIs and declares `@earendil-works/pi-coding-agent` and `@earendil-works/pi-tui` `>=1.5.2 <1.7.0` as peers. Tests run against `1.6.0`, and `npm run smoke:host` loads the extension with the Pi `1.6.0` loader installed locally. This does not establish a wider compatibility range.
 
 ## English
 
@@ -38,7 +38,7 @@ The Pi extension entry point is `src/extension.ts`. The package also provides th
 
 ### Use
 
-Run `/autoskills` to open the interactive menu. `/autoskills status` returns structured headless status. The menu groups are **Active**, **Suggestions**, **Agents**, and **Settings**. The Settings **config** panel displays the current mode; use the arrow keys to choose, Enter to apply, and Escape to return to Settings. The tested menu callbacks do not certify terminal rendering.
+Run `/autoskills` (or `/autoskills config`) to open the interactive menu; it opens without running any command. `/autoskills status` returns structured headless status. The panel lists the **Mode** and **Language** settings, then the read-only actions with their group in the value column: **Active** (Show selected skills), **Suggestions** (Explain selection, Detect context), **Agents** (Agents) and **Settings** (Doctor). Use ↑/↓ to move and Enter to edit a setting or run an action; action results are posted to the chat. Edits are drafts: **Ctrl+S** saves and keeps the panel open, and a failed save keeps the draft. Esc goes back from a list without applying, cancels a running action or save, and with unsaved changes warns first; a second Esc discards them and closes. Ctrl+C stays with Pi. Automated tests drive the panel by keyboard bytes at 40, 80 and 120 columns; they do not replace a review in a real terminal.
 
 Domain actions include `show`, `detect`, `explain`, `pin <skill...>`, `pin clear`, `agents`, `delegate <agent> <objective>`, `audit <file>`, `install <file-or-https-url> <sha256> <id>`, and `update <file-or-https-url> <sha256> <id>`. Shared actions include `auto`, `off`, `observe`, `config`, `doctor`, `storage status`, and `storage migrate files|sqlite|durable`. The CLI accepts the same actions; for example:
 
@@ -57,7 +57,7 @@ Skills default to `~/.pi/agent/skills`, and agent definitions to `~/.pi/agent/ag
 
 ### Language
 
-This README is provided in English and Brazilian Portuguese. The menu starts in English. Open **Settings → Language** to preview English or Português (Brasil); **Ctrl+S** saves the preference only for the trusted project at `.pi/pi-autoskills.locale.json`. Missing or invalid preferences fall back to English. CLI actions and structured outputs keep their stable command values.
+This README is provided in English and Brazilian Portuguese. The menu starts in English. Choose **Language** in the menu to preview English or Português (Brasil) immediately; **Ctrl+S** saves the preference only for the trusted project at `.pi/pi-autoskills.locale.json`, and discarding the draft returns to the saved language. In a project Pi does not trust, the field is locked and shows why. Missing or invalid preferences fall back to English. CLI actions and structured outputs keep their stable command values.
 
 ### Privacy and security
 
@@ -71,7 +71,7 @@ Start with `node dist/cli.js doctor` and `node dist/cli.js status`. Use [archite
 
 ### License
 
-The software is MIT licensed; see [LICENSE](LICENSE). The bundled INTEIRO mark is separately attributed and licensed in [its asset notice](docs/assets/INTEIRO-MARK-LICENSE.txt).
+The software is MIT licensed; see [LICENSE](LICENSE). Third-party code bundled under `src/vendor/` is listed in [its notice](src/vendor/THIRD_PARTY_NOTICES.md).
 
 ## Português (Brasil)
 
@@ -105,7 +105,7 @@ A entrada da extensão Pi é `src/extension.ts`. O pacote também oferece a CLI 
 
 ### Uso
 
-Execute `/autoskills` para abrir o menu interativo. `/autoskills status` retorna o estado estruturado para uso headless. Os grupos do menu são **Active**, **Suggestions**, **Agents** e **Settings**. O painel **config** mostra o modo atual; use as setas para escolher, Enter para aplicar e Esc para voltar a Settings. Os testes de callbacks não certificam a renderização no terminal.
+Execute `/autoskills` (ou `/autoskills config`) para abrir o menu interativo; ele abre sem executar nenhum comando. `/autoskills status` retorna o estado estruturado para uso headless. O painel lista as configurações **Modo** e **Idioma** e depois as ações somente leitura, com o grupo na coluna de valor: **Ativas** (Exibir skills selecionadas), **Sugestões** (Explicar seleção, Detectar contexto), **Agentes** (Agentes) e **Configurações** (Diagnóstico). Use ↑/↓ para navegar e Enter para editar uma configuração ou executar uma ação; os resultados vão para o chat. Edições são rascunho: **Ctrl+S** salva e mantém o painel aberto, e uma falha ao salvar preserva o rascunho. Esc volta de uma lista sem aplicar, cancela uma ação ou um salvamento em andamento e, com alterações não salvas, primeiro avisa; o segundo Esc descarta e fecha. Ctrl+C continua com o Pi. Os testes automatizados dirigem o painel por bytes de teclado em 40, 80 e 120 colunas; eles não substituem uma revisão num terminal real.
 
 As ações de domínio incluem `show`, `detect`, `explain`, `pin <skill...>`, `pin clear`, `agents`, `delegate <agent> <objective>`, `audit <file>`, `install <file-or-https-url> <sha256> <id>` e `update <file-or-https-url> <sha256> <id>`. Ações compartilhadas incluem `auto`, `off`, `observe`, `config`, `doctor`, `storage status` e `storage migrate files|sqlite|durable`. A CLI aceita as mesmas ações. Exemplos:
 
@@ -124,7 +124,7 @@ Skills ficam por padrão em `~/.pi/agent/skills`, e definições de agentes em `
 
 ### Idioma
 
-Este README está em inglês e português brasileiro. O menu começa em inglês. Abra **Configurações → Idioma** para pré-visualizar inglês ou português (Brasil); **Ctrl+S** salva a preferência somente para o projeto confiável em `.pi/pi-autoskills.locale.json`. Preferências ausentes ou inválidas usam inglês como fallback. As ações da CLI e as saídas estruturadas mantêm seus valores estáveis.
+Este README está em inglês e português brasileiro. O menu começa em inglês. Escolha **Idioma** no menu para pré-visualizar inglês ou português (Brasil) na hora; **Ctrl+S** salva a preferência somente para o projeto confiável em `.pi/pi-autoskills.locale.json`, e descartar o rascunho volta ao idioma salvo. Em projeto que o Pi não considera confiável, o campo fica bloqueado e mostra o motivo. Preferências ausentes ou inválidas usam inglês como fallback. As ações da CLI e as saídas estruturadas mantêm seus valores estáveis.
 
 ### Privacidade e segurança
 
@@ -138,4 +138,4 @@ Comece com `node dist/cli.js doctor` e `node dist/cli.js status`. Consulte [arqu
 
 ### Licença
 
-O software usa a licença MIT; consulte [LICENSE](LICENSE). A marca INTEIRO incluída tem atribuição e licença próprias em [seu aviso](docs/assets/INTEIRO-MARK-LICENSE.txt).
+O software usa a licença MIT; consulte [LICENSE](LICENSE). O código de terceiros incluído em `src/vendor/` está listado no [aviso](src/vendor/THIRD_PARTY_NOTICES.md).

@@ -25,8 +25,9 @@ Use this specialization for work in the Pi Autoskills repository. The shared wor
 ## User entry points
 
 - The root command /autoskills opens the interactive menu; /autoskills status is the structured headless status command.
-- Preserve the existing Active, Suggestions, Agents and Settings grouping.
-- Settings changes are drafts until explicit save. The language preference saves only for a trusted project using Ctrl+S; Escape returns without saving.
+- Preserve the existing Active, Suggestions, Agents and Settings grouping (shown in the value column of each menu action).
+- Settings changes are drafts until explicit save. The language preference saves only for a trusted project using Ctrl+S; Escape returns without saving, and a second Escape discards the draft.
+- The menu panel is the vendored Pi settings adapter in src/vendor; regenerate it with the upstream vendoring script, never edit it by hand.
 - CLI output and commands retain stable values across locales.
 
 ## Safety and verification

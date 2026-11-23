@@ -1,7 +1,8 @@
 # Configuration
 
-Installing starts with safe defaults. `/autoskills config` opens a mode wizard in
-TUI or displays validated config in headless modes. User settings are stored in
+Installing starts with safe defaults. `/autoskills config` opens the menu panel in
+TUI (Mode and Language are edited as a draft and saved with Ctrl+S) or displays
+validated config in headless modes. User settings are stored in
 `~/.pi/agent/state/pi-autoskills/config.json` (or under PI_ECOSYSTEM_STATE_ROOT).
 `schemas/config.schema.json` is the complete machine-readable schema, and
 `defaults()` / `validateConfig()` are the public TypeScript implementations.
