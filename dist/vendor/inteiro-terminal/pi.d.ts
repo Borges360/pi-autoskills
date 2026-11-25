@@ -3,6 +3,7 @@ import type { Binding, TerminalResult, Values } from "./contracts.ts";
 import { PanelController, type PanelControllerOptions, type PanelTask } from "./controller.ts";
 import { type Locale, type MessageOverrides } from "./i18n.ts";
 import { WorkspaceModel } from "./workspace.ts";
+export { installInteiroPiThemes, registerInteiroPiThemes, piAgentDir, type PiThemeInstallOptions, type PiThemeInstallResult, } from "./pi-theme-install.ts";
 /**
  * The subset of the Pi theme the adapter paints with. IDS roles map to host tokens:
  * choose → `accent`; commit (real effect) → `bashMode` + bold, the editor color for running commands

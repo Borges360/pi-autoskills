@@ -32,6 +32,13 @@ import {
   type MessageOverrides,
 } from "./i18n.ts";
 import { WorkspaceModel } from "./workspace.ts";
+export {
+  installInteiroPiThemes,
+  registerInteiroPiThemes,
+  piAgentDir,
+  type PiThemeInstallOptions,
+  type PiThemeInstallResult,
+} from "./pi-theme-install.ts";
 // Layout must measure exactly like the host renderer: pi-tui stops the TUI when a line is wider
 // than the terminal. The adapter therefore never depends on another width library.
 setCellWidthMeasure(visibleWidth);

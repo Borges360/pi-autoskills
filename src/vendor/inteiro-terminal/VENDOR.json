@@ -8,9 +8,9 @@
   "source": {
     "repository": "https://github.com/Borges360/ids.git",
     "path": "packages/terminal/src",
-    "commit": "6a1bd7d23b925506de16a9b6e0230c8ac368e757",
-    "packageCommit": "6a1bd7d23b925506de16a9b6e0230c8ac368e757",
-    "date": "2026-11-25T09:49:39.000Z",
+    "commit": "64348b946d713618893e559ca2dabb6799e481e3",
+    "packageCommit": "64348b946d713618893e559ca2dabb6799e481e3",
+    "date": "2026-11-25T10:12:22.000Z",
     "dirty": false
   },
   "externals": [
@@ -71,10 +71,22 @@
       "sha256": "c1f4312dae0af6551f8744c2b3898f371979a646d27493cb9172491ce167eaf7"
     },
     {
+      "path": "pi-theme-install.ts",
+      "upstream": "packages/terminal/src/pi-theme-install.ts",
+      "upstreamSha256": "5c5288e6c69d734316e3ea6f012642ca13fe5c4ad940f2372b0c7b8240b896c8",
+      "sha256": "5c5288e6c69d734316e3ea6f012642ca13fe5c4ad940f2372b0c7b8240b896c8"
+    },
+    {
+      "path": "pi-themes.ts",
+      "upstream": "packages/terminal/src/pi-themes.ts",
+      "upstreamSha256": "b452e7ddd13b29dda2e9b9e40d36e33b1f1cdce89340b261ffa1ff36cc1e8962",
+      "sha256": "b452e7ddd13b29dda2e9b9e40d36e33b1f1cdce89340b261ffa1ff36cc1e8962"
+    },
+    {
       "path": "pi.ts",
       "upstream": "packages/terminal/src/pi.ts",
-      "upstreamSha256": "fa5e0c6925f4e308328c17afb5199f5500c97b176de40c140c492d85eb570203",
-      "sha256": "fa5e0c6925f4e308328c17afb5199f5500c97b176de40c140c492d85eb570203"
+      "upstreamSha256": "5625e5a54c0529e58c9b47b5ede58115b6461a69b612a1f6c8ebcdc600224ecd",
+      "sha256": "5625e5a54c0529e58c9b47b5ede58115b6461a69b612a1f6c8ebcdc600224ecd"
     },
     {
       "path": "settings.ts",

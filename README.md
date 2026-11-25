@@ -81,6 +81,8 @@ node dist/cli.js doctor
 
 Precedence: command override, trusted project configuration, user configuration, built-in defaults. Project configuration cannot raise user security limits. All settings are in [CONFIGURATION.md](CONFIGURATION.md).
 
+Themes: on load, the extension copies the color themes of its terminal adapter to `<agent-dir>/themes/`, so they are listed in `/settings` → **Theme**. It never changes the selected theme and never overwrites a theme file you edited. Set `PI_DESIGN_THEMES=off` to skip the copy.
+
 ### Language
 
 The menu starts in English. Choose **Language** to preview English or Português (Brasil) immediately. **Ctrl+S** saves the preference for the trusted project only, at `.pi/pi-autoskills.locale.json`; discarding the draft returns to the saved language. In a project Pi does not trust, the field is locked and shows why. A missing or invalid preference falls back to English. CLI actions and structured outputs keep their stable command values.
@@ -193,6 +195,8 @@ node dist/cli.js doctor
 | Padrões | Modo `auto`, armazenamento `files`, acesso de escrita desabilitado. |
 
 Precedência: override do comando, configuração de projeto confiável, configuração do usuário, padrões internos. A configuração do projeto não pode elevar limites de segurança do usuário. Todas as opções estão em [CONFIGURATION.md](CONFIGURATION.md).
+
+Temas: ao carregar, a extensão copia os temas de cores do seu adaptador de terminal para `<agent-dir>/themes/`, e eles aparecem em `/settings` → **Theme**. Ela nunca troca o tema escolhido nem sobrescreve um arquivo de tema que você editou. Defina `PI_DESIGN_THEMES=off` para não copiar.
 
 ### Idioma
 

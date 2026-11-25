@@ -52,7 +52,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "lint": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test tests/*.test.mjs",
+    "test": "npm run build && node --import ./tests/setup-env.mjs --test tests/*.test.mjs",
     "benchmark": "npm run build && node benchmarks/run.mjs",
     "prepack": "npm run build",
     "format": "prettier --write src tests benchmarks *.md",
