@@ -6,7 +6,9 @@ import { type TerminalMessages } from "./i18n.ts";
  * Semantic role of a projected line. Renderers map it to their theme (Pi: `theme.fg/bold`);
  * the text itself stays readable without color.
  */
-export type LineKind = "title" | "muted" | "focus" | "error" | "success" | "warning" | "info" | "label" | "input";
+export type LineKind = "title" | "muted" | "focus" | "error" | "success" | "warning" | "info" | "label" | "input"
+/** Action bar: renderers split it with `actionSegments` to paint each button by role. */
+ | "actions";
 export interface View {
     lines: string[];
     focusedLine: number;
@@ -39,11 +41,27 @@ export declare function SecretInput(label: string, error?: string, messages?: Te
 export declare function Select(label: string, choices: readonly Choice[], focusedId: string, selectedId: string, messages?: TerminalMessages): View;
 export declare function MultiSelect(label: string, choices: readonly Choice[], focusedId: string, selected: readonly string[], messages?: TerminalMessages): View;
 export declare function SearchField(query: string, count: number, messages?: TerminalMessages): View;
-export declare function ActionBar(actions: readonly {
+/** Semantic role of an action button: `commit` makes a real effect, `choose` selects or navigates. */
+export type ActionRole = "commit" | "choose";
+export interface BarAction {
     id: string;
     label: string;
     disabled?: string;
-}[], focusedId?: string, messages?: TerminalMessages): View;
+    /** Default `choose`. */
+    role?: ActionRole;
+}
+export declare function ActionBar(actions: readonly BarAction[], focusedId?: string, messages?: TerminalMessages): View;
+export interface ActionSegment {
+    text: string;
+    /** Unset for separators and plain text. */
+    role?: ActionRole | "muted";
+    focused?: boolean;
+}
+/**
+ * Splits a projected action-bar line (whole or wrapped) into buttons so a renderer can paint each one
+ * by role without changing the text: joining every `text` returns the line unchanged.
+ */
+export declare function actionSegments(line: string, actions: readonly BarAction[], focusedId?: string): ActionSegment[];
 export declare function KeyHints(bindings: readonly Binding[], actions: Parameters<typeof keyHints>[1], ascii?: boolean): View;
 export declare function Breadcrumbs(parts: readonly string[]): View;
 export declare function ConfirmAction(object: string, consequence: string, destination: string, label: string, messages?: TerminalMessages): View;

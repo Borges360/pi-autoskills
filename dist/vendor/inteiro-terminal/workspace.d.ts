@@ -51,6 +51,13 @@ export declare class WorkspaceModel {
     /** True when a locale was given (constructor option or `setLocale`), not the package default. */
     get hasLocale(): boolean;
     get actions(): string[];
+    /** Action-bar buttons; all navigate or switch views, so they take the `choose` role. */
+    get barActions(): {
+        id: string;
+        label: string;
+        role: "choose";
+    }[];
+    get focusedActionId(): string | undefined;
     dispatch(action: ActionId): void;
     linear(): View;
     render(columns: number, rows: number): View;

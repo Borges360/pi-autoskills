@@ -133,8 +133,11 @@ export declare class PanelController {
     /** Bar actions (Tab region). */
     get actions(): {
         id: string;
+        role: "choose" | "commit";
         label: string;
     }[];
+    /** Id of the focused action-bar button, when the action region has focus. */
+    get focusedActionId(): string | undefined;
     /** Running operation (bar task, action row, choice loading or storage check), if any. */
     get activeOperation(): Operation<unknown> | undefined;
     get busy(): boolean;

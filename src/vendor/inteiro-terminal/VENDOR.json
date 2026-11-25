@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
   "package": "@inteiro/terminal",
-  "version": "1.4.0",
+  "version": "2.0.0-rc.1",
   "contract": "1.0.0",
   "format": "ts",
   "entry": "pi.ts",
   "source": {
     "repository": "https://github.com/Borges360/ids.git",
     "path": "packages/terminal/src",
-    "commit": "67d70e81d6872aaea75d81e2d670fc0552a8ea32",
-    "packageCommit": "67d70e81d6872aaea75d81e2d670fc0552a8ea32",
-    "date": "2026-11-23T16:33:19.000Z",
+    "commit": "6a1bd7d23b925506de16a9b6e0230c8ac368e757",
+    "packageCommit": "6a1bd7d23b925506de16a9b6e0230c8ac368e757",
+    "date": "2026-11-25T09:49:39.000Z",
     "dirty": false
   },
   "externals": [
@@ -25,8 +25,8 @@
     {
       "path": "components.ts",
       "upstream": "packages/terminal/src/components.ts",
-      "upstreamSha256": "eda40c404dc36ece56689399856d079a5ac4b6e0335ce2310ecfd49c376e11f4",
-      "sha256": "eda40c404dc36ece56689399856d079a5ac4b6e0335ce2310ecfd49c376e11f4"
+      "upstreamSha256": "250917af37dded3e14339139aa22c5c9dfa54927ff45a0be510ea6b406d9c3f5",
+      "sha256": "250917af37dded3e14339139aa22c5c9dfa54927ff45a0be510ea6b406d9c3f5"
     },
     {
       "path": "contracts.ts",
@@ -37,8 +37,8 @@
     {
       "path": "controller.ts",
       "upstream": "packages/terminal/src/controller.ts",
-      "upstreamSha256": "ec44988b7026addcfc2a0502ef841a8b41429308ed1f85d3d15cd18b4c201800",
-      "sha256": "ec44988b7026addcfc2a0502ef841a8b41429308ed1f85d3d15cd18b4c201800"
+      "upstreamSha256": "c2677cbd1239f9b141e0859e53e1cabfff3c0cf32258489bfa8eb73dc50f8f4b",
+      "sha256": "c2677cbd1239f9b141e0859e53e1cabfff3c0cf32258489bfa8eb73dc50f8f4b"
     },
     {
       "path": "errors.ts",
@@ -73,8 +73,8 @@
     {
       "path": "pi.ts",
       "upstream": "packages/terminal/src/pi.ts",
-      "upstreamSha256": "e8a29451d9d528530e31ed36719331f68265e5c484cb96ab84c729f19a0bc0ab",
-      "sha256": "e8a29451d9d528530e31ed36719331f68265e5c484cb96ab84c729f19a0bc0ab"
+      "upstreamSha256": "fa5e0c6925f4e308328c17afb5199f5500c97b176de40c140c492d85eb570203",
+      "sha256": "fa5e0c6925f4e308328c17afb5199f5500c97b176de40c140c492d85eb570203"
     },
     {
       "path": "settings.ts",
@@ -91,8 +91,8 @@
     {
       "path": "workspace.ts",
       "upstream": "packages/terminal/src/workspace.ts",
-      "upstreamSha256": "a26416266beff01f1af2bd9488058173689d62d0c511c06e47636a619e77ad28",
-      "sha256": "a26416266beff01f1af2bd9488058173689d62d0c511c06e47636a619e77ad28"
+      "upstreamSha256": "6d5e48cc03cae7603b55cbd867747002000988c2fdb949a0d338937b877ce5d5",
+      "sha256": "6d5e48cc03cae7603b55cbd867747002000988c2fdb949a0d338937b877ce5d5"
     }
   ],
   "license": {

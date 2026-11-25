@@ -242,6 +242,7 @@ export class PanelController {
     return [
       {
         id: "save",
+        role: "commit" as const,
         label: reconcile
           ? this.messages.actionReconcile
           : this.messages.actionSave,
@@ -250,15 +251,25 @@ export class PanelController {
         ? [
             {
               id: "run",
+              role:
+                this.task.effect === "external" && !this.operation.active
+                  ? ("commit" as const)
+                  : ("choose" as const),
               label: this.operation.active
                 ? this.messages.actionCancelOperation
                 : this.task.label,
             },
           ]
         : []),
-      { id: "help", label: this.messages.actionHelp },
-      { id: "close", label: this.messages.actionClose },
+      { id: "help", role: "choose" as const, label: this.messages.actionHelp },
+      { id: "close", role: "choose" as const, label: this.messages.actionClose },
     ];
+  }
+  /** Id of the focused action-bar button, when the action region has focus. */
+  get focusedActionId(): string | undefined {
+    return this.region === "actions"
+      ? this.actions[this.actionIndex]?.id
+      : undefined;
   }
   /** Running operation (bar task, action row, choice loading or storage check), if any. */
   get activeOperation(): Operation<unknown> | undefined {
@@ -833,7 +844,17 @@ export class PanelController {
           fullText: [m.noSearchResults],
           kinds: ["muted"],
         };
-    if (this.navigation.searchable)
+    // Standard (host) presentation: the search line only appears while a filter is active; the
+    // hint line already offers the search key. Legacy keeps the 1.3 output.
+    if (this.navigation.searchable && this.presentation === "standard") {
+      if (this.search)
+        body = {
+          lines: [`${m.searchItems}: ${this.search}`, ...body.lines],
+          focusedLine: body.focusedLine + 1,
+          fullText: [`${m.searchItems}: ${this.search}`, ...body.fullText],
+          kinds: ["muted", ...(body.kinds ?? [])],
+        };
+    } else if (this.navigation.searchable)
       body = {
         lines: [`[${m.searchItems}] ${this.search}`, ...body.lines],
         focusedLine: body.focusedLine + 1,
@@ -1056,13 +1077,7 @@ export class PanelController {
       help: this.help ? "" : this.focusedDescription(),
       feedback: feedback.text,
       ...(feedback.kind ? { feedbackKind: feedback.kind } : {}),
-      actions: ActionBar(
-        this.actions,
-        this.region === "actions"
-          ? this.actions[this.actionIndex]?.id
-          : undefined,
-        m,
-      ),
+      actions: ActionBar(this.actions, this.focusedActionId, m),
       hints: this.hints(ascii),
       columns,
       rows,

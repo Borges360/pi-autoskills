@@ -3,8 +3,14 @@ import type { Binding, TerminalResult, Values } from "./contracts.ts";
 import { PanelController, type PanelControllerOptions, type PanelTask } from "./controller.ts";
 import { type Locale, type MessageOverrides } from "./i18n.ts";
 import { WorkspaceModel } from "./workspace.ts";
+/**
+ * The subset of the Pi theme the adapter paints with. IDS roles map to host tokens:
+ * choose → `accent`; commit (real effect) → `bashMode` + bold, the editor color for running commands
+ * for real; focus → `accent` over `selectedBg`. `bg` is optional so older hosts degrade to color only.
+ */
 export interface PiTheme {
-    fg(name: "accent" | "muted" | "error" | "success" | "warning", text: string): string;
+    fg(name: "accent" | "muted" | "error" | "success" | "warning" | "bashMode", text: string): string;
+    bg?(name: "selectedBg", text: string): string;
     bold?(text: string): string;
 }
 export interface PiRuntime {

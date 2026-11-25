@@ -16,7 +16,9 @@ export type LineKind =
   | "warning"
   | "info"
   | "label"
-  | "input";
+  | "input"
+  /** Action bar: renderers split it with `actionSegments` to paint each button by role. */
+  | "actions";
 export interface View {
   lines: string[];
   focusedLine: number;
@@ -255,19 +257,74 @@ export function SearchField(
     count ? messages.searchResults(count) : messages.noFilterResults,
   ]);
 }
+/** Semantic role of an action button: `commit` makes a real effect, `choose` selects or navigates. */
+export type ActionRole = "commit" | "choose";
+export interface BarAction {
+  id: string;
+  label: string;
+  disabled?: string;
+  /** Default `choose`. */
+  role?: ActionRole;
+}
 export function ActionBar(
-  actions: readonly { id: string; label: string; disabled?: string }[],
+  actions: readonly BarAction[],
   focusedId?: string,
   messages: TerminalMessages = PT(),
 ): View {
-  return view([
-    actions
-      .map(
-        (a) =>
-          `${a.id === focusedId ? ">" : ""}[${a.label}]${a.disabled ? ` ${messages.unavailableShort(a.disabled)}` : ""}`,
-      )
-      .join(" "),
-  ]);
+  return view(
+    [
+      actions
+        .map(
+          (a) =>
+            `${a.id === focusedId ? ">" : ""}[${a.label}]${a.disabled ? ` ${messages.unavailableShort(a.disabled)}` : ""}`,
+        )
+        .join(" "),
+    ],
+    0,
+    ["actions"],
+  );
+}
+export interface ActionSegment {
+  text: string;
+  /** Unset for separators and plain text. */
+  role?: ActionRole | "muted";
+  focused?: boolean;
+}
+/**
+ * Splits a projected action-bar line (whole or wrapped) into buttons so a renderer can paint each one
+ * by role without changing the text: joining every `text` returns the line unchanged.
+ */
+export function actionSegments(
+  line: string,
+  actions: readonly BarAction[],
+  focusedId?: string,
+): ActionSegment[] {
+  const out: ActionSegment[] = [];
+  const push = (seg: ActionSegment) => {
+    const last = out[out.length - 1];
+    if (!seg.role && !seg.focused && last && !last.role && !last.focused)
+      last.text += seg.text;
+    else out.push(seg);
+  };
+  let i = 0;
+  scan: while (i < line.length) {
+    for (const a of actions) {
+      const focused = a.id === focusedId;
+      const token = `${focused ? ">" : ""}[${a.label}]`;
+      if (line.startsWith(token, i)) {
+        push({
+          text: token,
+          role: a.disabled ? "muted" : (a.role ?? "choose"),
+          ...(focused ? { focused: true } : {}),
+        });
+        i += token.length;
+        continue scan;
+      }
+    }
+    push({ text: line[i]! });
+    i++;
+  }
+  return out;
 }
 export function KeyHints(
   bindings: readonly Binding[],

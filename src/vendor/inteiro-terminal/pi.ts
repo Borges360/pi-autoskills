@@ -20,7 +20,11 @@ import {
   type PanelControllerOptions,
   type PanelTask,
 } from "./controller.ts";
-import type { LineKind } from "./components.ts";
+import {
+  actionSegments,
+  type BarAction,
+  type LineKind,
+} from "./components.ts";
 import { setCellWidthMeasure } from "./text.ts";
 import {
   resolveMessages,
@@ -31,12 +35,23 @@ import { WorkspaceModel } from "./workspace.ts";
 // Layout must measure exactly like the host renderer: pi-tui stops the TUI when a line is wider
 // than the terminal. The adapter therefore never depends on another width library.
 setCellWidthMeasure(visibleWidth);
+/**
+ * The subset of the Pi theme the adapter paints with. IDS roles map to host tokens:
+ * choose → `accent`; commit (real effect) → `bashMode` + bold, the editor color for running commands
+ * for real; focus → `accent` over `selectedBg`. `bg` is optional so older hosts degrade to color only.
+ */
 export interface PiTheme {
   fg(
-    name: "accent" | "muted" | "error" | "success" | "warning",
+    name: "accent" | "muted" | "error" | "success" | "warning" | "bashMode",
     text: string,
   ): string;
+  bg?(name: "selectedBg", text: string): string;
   bold?(text: string): string;
+}
+/** Action-bar context the painter needs to split the bar into role-colored buttons. */
+interface BarContext {
+  actions: readonly BarAction[];
+  focusedId: string | undefined;
 }
 export interface PiRuntime {
   requestRender(): void;
@@ -100,11 +115,51 @@ export function piBindings(
   );
   return resolveBindingsLenient(host, reserved, ctrlS, options);
 }
-/** Paints semantic line kinds with the host theme only; no fixed ANSI. */
-function paint(theme: PiTheme, kind: LineKind | "raw" | undefined, line: string) {
+const selected = (theme: PiTheme, text: string) =>
+  theme.bg ? theme.bg("selectedBg", text) : text;
+function paintButton(
+  theme: PiTheme,
+  role: "commit" | "choose" | "muted" | undefined,
+  text: string,
+) {
+  switch (role) {
+    case "commit": {
+      const colored = theme.fg("bashMode", text);
+      return theme.bold ? theme.bold(colored) : colored;
+    }
+    case "choose":
+      return theme.fg("accent", text);
+    case "muted":
+      return theme.fg("muted", text);
+    default:
+      return text;
+  }
+}
+/**
+ * Paints semantic line kinds with the host theme only; no fixed ANSI. The focused row is marked by
+ * `>` and by the host selection background across the whole width, not by color alone.
+ */
+function paint(
+  theme: PiTheme,
+  kind: LineKind | "raw" | undefined,
+  line: string,
+  width: number,
+  bar?: BarContext,
+) {
   switch (kind) {
     case "focus":
-      return theme.fg("accent", line);
+      return selected(
+        theme,
+        theme.fg("accent", line + " ".repeat(Math.max(0, width - visibleWidth(line)))),
+      );
+    case "actions":
+      if (!bar) return line;
+      return actionSegments(line, bar.actions, bar.focusedId)
+        .map((s) => {
+          const painted = paintButton(theme, s.role, s.text);
+          return s.focused ? selected(theme, painted) : painted;
+        })
+        .join("");
     case "error":
       return theme.fg("error", line);
     case "warning":
@@ -330,9 +385,10 @@ export class PiSettingsPanel implements Component {
         }
       }
     }
+    const bar: BarContext = { actions: c.actions, focusedId: c.focusedActionId };
     return lines
       .slice(0, rows)
-      .map((line, i) => paint(this.theme, kinds[i], fit(line, width)));
+      .map((line, i) => paint(this.theme, kinds[i], fit(line, width), width, bar));
   }
   async drain() {
     await Promise.all([...this.pending]);
@@ -534,7 +590,10 @@ export async function openPiWorkspace(
               overlayRows(tui.terminal?.rows ?? 24, overlay),
             );
             return frame.lines.map((l, i) =>
-              paint(theme, frame.kinds?.[i], fit(l, width)),
+              paint(theme, frame.kinds?.[i], fit(l, width), width, {
+                actions: model.barActions,
+                focusedId: model.focusedActionId,
+              }),
             );
           },
           handleInput(data) {

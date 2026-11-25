@@ -62,6 +62,17 @@ export class WorkspaceModel {
             m.workspaceClose,
         ];
     }
+    /** Action-bar buttons; all navigate or switch views, so they take the `choose` role. */
+    get barActions() {
+        return this.actions.map((label, i) => ({
+            id: String(i),
+            label,
+            role: "choose",
+        }));
+    }
+    get focusedActionId() {
+        return this.region === "actions" ? String(this.actionIndex) : undefined;
+    }
     dispatch(action) {
         if (action === "back" || action === "close") {
             this.closed = true;
@@ -137,7 +148,7 @@ export class WorkspaceModel {
             body,
             help: this.help ?? m.workspaceHelp,
             feedback: "",
-            actions: ActionBar(this.actions.map((label, i) => ({ id: String(i), label })), this.region === "actions" ? String(this.actionIndex) : undefined, m),
+            actions: ActionBar(this.barActions, this.focusedActionId, m),
             hints: {
                 lines: [this.hints ?? m.workspaceHints],
                 fullText: [],

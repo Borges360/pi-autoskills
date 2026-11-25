@@ -12,7 +12,7 @@ test("vendored terminal adapter matches its manifest hashes (no IDS checkout nee
   assert.deepEqual(result.problems, []);
   assert.equal(result.ok, true);
   const m = result.manifest;
-  assert.equal(m.version, "1.4.0");
+  assert.equal(m.version, "2.0.0-rc.1");
   assert.equal(m.format, "ts");
   assert.equal(m.source.dirty, false);
   assert.deepEqual(m.patches, []);
