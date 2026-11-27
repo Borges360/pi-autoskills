@@ -9,7 +9,8 @@
     "rootDir": "src",
     "skipLibCheck": true,
     "noUncheckedIndexedAccess": true,
-    "newLine": "lf"
+    "newLine": "lf",
+    "rewriteRelativeImportExtensions": true
   },
   "include": [
     "src/**/*.ts"

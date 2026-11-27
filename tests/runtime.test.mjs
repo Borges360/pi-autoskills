@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { visibleWidth } from "@earendil-works/pi-tui";
+import { getKeybindings, visibleWidth } from "@earendil-works/pi-tui";
 import { mkdtemp, rm, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -156,31 +156,15 @@ test("extension loads independently and all discovery commands work without TUI"
     { messageType: "user", prompt: "Explain a small function" },
     ctx,
   );
+  // Interactive menu: the real vendored Pi panel, driven by terminal bytes with the real pi-tui
+  // KeybindingsManager, through the registered command handler.
+  const KEY = { up: "\x1b[A", down: "\x1b[B", enter: "\r", esc: "\x1b", ctrlS: "\x13" };
+  const ORDER = ["mode", "language", "show", "explain", "detect", "agents", "doctor"];
   const tui = { ...ctx, mode: "tui", hasUI: true };
-  const keybindings = {
-    getKeys: (binding) =>
-      ({
-        "tui.select.confirm": ["enter"],
-        "tui.select.cancel": ["escape"],
-        "tui.select.up": ["up"],
-        "tui.select.down": ["down"],
-      })[binding] ?? [],
-    matches: (data, binding) =>
-      ({
-        "tui.select.confirm": "enter",
-        "tui.select.cancel": "escape",
-        "tui.select.up": "up",
-        "tui.select.down": "down",
-      })[binding] === data,
-  };
   const interactions = [];
   let closedPanels = 0;
   let renderRequests = 0;
-  const theme = {
-    fg: (_color, value) => value,
-    bg: (_color, value) => value,
-    bold: (value) => value,
-  };
+  const theme = { fg: (_color, value) => value, bold: (value) => value };
   const dashboardTui = {
     ...tui,
     ui: {
@@ -193,222 +177,168 @@ test("extension loads independently and all discovery commands work without TUI"
         const finished = new Promise((resolve) => {
           finish = resolve;
         });
-        const panel = await factory(
-          {
-            requestRender: () => renderRequests++,
-            terminal: { rows: 24 },
-          },
+        const panel = factory(
+          { requestRender: () => renderRequests++, terminal: { rows: 24 } },
           theme,
-          keybindings,
+          getKeybindings(),
           (action) => {
             closedPanels++;
             finish(action);
           },
         );
-        await interaction(panel);
+        const tick = () => new Promise((resolve) => setImmediate(resolve));
+        const settle = async () => {
+          for (let i = 0; i < 6; i++) {
+            await panel.drain();
+            await tick();
+          }
+        };
+        const driver = {
+          panel,
+          render: (width = 100) => panel.render(width).join("\n"),
+          key: async (...data) => {
+            for (const d of data) {
+              panel.handleInput(d);
+              await settle();
+            }
+          },
+          goto: async (id) => {
+            let at = ORDER.indexOf(panel.controller.session.focusedId);
+            for (; at < ORDER.indexOf(id); at++) await driver.key(KEY.down);
+            for (; at > ORDER.indexOf(id); at--) await driver.key(KEY.up);
+            assert.equal(panel.controller.session.focusedId, id);
+          },
+          settle,
+        };
+        await interaction(driver);
         return await finished;
       },
     },
   };
-  const render = (panel, width = 80) =>
-    panel
-      .render(width)
-      .map((line) => line.trimEnd())
-      .join("\n");
   const configPath = join(defaults(name).storage.root, "config.json");
-  const waitFor = async (predicate, description) => {
-    for (let i = 0; i < 50 && !predicate(); i++)
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    assert.ok(predicate(), description);
+  const fits = (p) => {
+    for (const width of [40, 80, 120])
+      for (const line of p.panel.render(width))
+        assert.ok(visibleWidth(line) <= width, `${width}: ${line}`);
   };
 
-  interactions.push(async (panel) => {
-    for (const width of [40, 80, 120]) {
-      const lines = panel.render(width);
-      assert.ok(lines.every((line) => visibleWidth(line) === width));
-    }
-    assert.match(render(panel), new RegExp(`${displayName}`));
-    assert.match(render(panel), /Current mode: Automatic/);
-    assert.match(render(panel), /Active/);
-    assert.match(render(panel), /Suggestions/);
-    assert.match(render(panel), /Agents/);
-    assert.match(render(panel), /Settings/);
-    await panel.handleInput("enter");
-    assert.match(render(panel), /Show selected skills/);
-    await panel.handleInput("escape");
-    await panel.drain();
-    await panel.handleInput("down");
-    await panel.handleInput("enter");
-    assert.match(render(panel), /Explain selection/);
-    assert.match(render(panel), /Detect context/);
-    await panel.handleInput("escape");
-    await panel.drain();
-    await panel.handleInput("down");
-    await panel.handleInput("enter");
-    assert.match(render(panel), /Agents/);
-    await panel.handleInput("escape");
-    await panel.drain();
-    await panel.handleInput("down");
-    await panel.handleInput("enter");
-    assert.match(render(panel), /Mode/);
-    assert.match(render(panel), /Doctor/);
-    await panel.handleInput("escape");
-    await panel.drain();
-    await panel.handleInput("up");
-    await panel.handleInput("up");
-    await panel.handleInput("enter");
-    await panel.handleInput("enter");
-    await panel.drain();
-    assert.match(render(panel), /Explain selection completed\./);
+  interactions.push(async (p) => {
+    fits(p);
+    const s = p.render(120);
+    assert.match(s, new RegExp(displayName));
+    for (const text of ["Current mode: Automatic", "Active", "Suggestions", "Agents", "Settings",
+      "Show selected skills", "Explain selection", "Detect context", "Doctor", "Mode", "Language"])
+      assert.ok(s.includes(text), `missing ${text}`);
+    await p.goto("explain");
+    await p.key(KEY.enter);
+    assert.match(p.render(), /Explain selection completed\./);
     assert.equal(messages.at(-1).customType, name);
-    await panel.close();
+    await p.key(KEY.esc);
   });
   await command.handler("", dashboardTui);
 
-  interactions.push(async (panel) => {
-    assert.match(render(panel), /Current mode: Automatic/);
-    for (let i = 0; i < 3; i++) await panel.handleInput("down");
-    await panel.handleInput("enter");
-    assert.match(render(panel), /Mode/);
-    assert.match(render(panel), /Doctor/);
-    await panel.handleInput("enter");
-    assert.match(render(panel), /Automatic/);
-    assert.match(render(panel), /Observe/);
-    await panel.handleInput("down");
-    await panel.handleInput("enter");
-    await panel.drain();
-    assert.match(render(panel), /Draft mode: Observe/);
+  interactions.push(async (p) => {
+    assert.match(p.render(), /Current mode: Automatic/);
+    await p.key(KEY.enter);
+    assert.match(p.render(), /Automatic/);
+    assert.match(p.render(), /Observe/);
+    await p.key(KEY.down, KEY.enter);
+    assert.match(p.render(), new RegExp(`${displayName} \\*`));
+    assert.match(p.render(), /Mode\s+Observe/);
     const savedBeforeFailure = await readFile(configPath, "utf8");
     assert.equal(JSON.parse(savedBeforeFailure).mode, "auto");
     await rm(configPath, { force: true });
     await mkdir(configPath);
-    await panel.handleInput("\u0013");
-    await waitFor(
-      () => render(panel).includes("Could not save mode. Draft preserved"),
-      "failed config write should preserve the mode draft",
-    );
-    assert.match(render(panel), /Current mode: Automatic/);
-    assert.match(render(panel), /Draft mode: Observe/);
+    await p.key(KEY.ctrlS);
+    assert.match(p.render(), /Could not save mode\. Draft preserved; try again\./);
+    assert.match(p.render(), /Current mode: Automatic/);
+    assert.match(p.render(), /Mode\s+Observe/);
     await rm(configPath, { recursive: true, force: true });
     await writeFile(configPath, savedBeforeFailure);
-    await panel.handleInput("\u0013");
-    await panel.drain();
-    assert.match(render(panel), /Saved mode: Observe/);
+    await p.key(KEY.ctrlS);
+    assert.match(p.render(), /Saved mode: Observe\./);
+    assert.match(p.render(), /Current mode: Observe/);
     const saved = JSON.parse(await readFile(configPath, "utf8"));
     assert.equal(saved.mode, "observe");
     assert.equal(saved.enabled, true);
-    await panel.close();
+    await p.key(KEY.esc);
   });
   await command.handler("config", dashboardTui);
 
-  interactions.push(async (panel) => {
-    for (let i = 0; i < 3; i++) await panel.handleInput("down");
-    await panel.handleInput("enter");
-    await panel.handleInput("enter");
-    await panel.handleInput("down");
-    await panel.handleInput("enter");
-    await panel.drain();
-    assert.match(render(panel), /Draft mode: Off/);
+  interactions.push(async (p) => {
+    await p.key(KEY.enter, KEY.down, KEY.enter);
+    assert.match(p.render(), /Mode\s+Off/);
     assert.equal(JSON.parse(await readFile(configPath, "utf8")).mode, "observe");
-    await panel.handleInput("escape");
-    assert.match(render(panel), /Unsaved changes/);
-    await panel.handleInput("escape");
+    await p.key(KEY.esc);
+    assert.match(p.render(), /There are unsaved changes/);
+    await p.key(KEY.esc);
     assert.equal(JSON.parse(await readFile(configPath, "utf8")).mode, "observe");
   });
   await command.handler("", dashboardTui);
 
-  interactions.push(async (panel) => {
-    for (let i = 0; i < 3; i++) await panel.handleInput("down");
-    await panel.handleInput("enter");
-    await panel.handleInput("down");
-    await panel.handleInput("enter");
-    await panel.drain();
-    assert.match(render(panel), /Doctor completed\./);
+  interactions.push(async (p) => {
+    await p.goto("doctor");
+    await p.key(KEY.enter);
+    assert.match(p.render(), /Doctor completed\./);
     assert.match(messages.at(-1).content, /storage/);
-    await panel.close();
+    await p.key(KEY.esc);
   });
   await command.handler("", dashboardTui);
 
   const priorMessages = messages.length;
-  interactions.push(async (panel) => {
-    await panel.close();
+  interactions.push(async (p) => {
+    await p.key(KEY.esc);
   });
   await command.handler("", dashboardTui);
 
   projectTrusted = true;
-  const openLanguageChoices = async (panel) => {
-    for (let i = 0; i < 3; i++) await panel.handleInput("down");
-    await panel.handleInput("enter");
-    await panel.handleInput("down");
-    await panel.handleInput("down");
-    await panel.handleInput("enter");
-  };
   const projectLocalePath = join(cwd, ".pi", "pi-autoskills.locale.json");
-  interactions.push(async (panel) => {
-    assert.match(render(panel), /Current language: English/);
-    await openLanguageChoices(panel);
-    assert.match(render(panel), /English/);
-    assert.match(render(panel), /Português \(Brasil\)/);
-    await panel.handleInput("down");
-    await panel.handleInput("enter");
-    await panel.drain();
-    assert.match(render(panel), /Rascunho do idioma: Português \(Brasil\)/);
-    for (const width of [40, 80, 120])
-      assert.ok(panel.render(width).every((line) => visibleWidth(line) === width));
-    assert.match(render(panel), /Ativas/);
-    assert.match(render(panel), /Configurações/);
-    assert.match(render(panel), /↑↓ navegar/);
-    await panel.handleInput("enter");
-    assert.match(render(panel), /Modo/);
-    assert.match(render(panel), /Diagnóstico/);
-    assert.match(render(panel), /Idioma/);
-    await panel.handleInput("escape");
-    await panel.drain();
-    for (let i = 0; i < 3; i++) await panel.handleInput("up");
-    await panel.handleInput("enter");
-    assert.match(render(panel), /Exibir skills selecionadas/);
-    await panel.handleInput("escape");
-    await panel.drain();
+  const choosePortuguese = async (p) => {
+    await p.goto("language");
+    await p.key(KEY.enter);
+    assert.match(p.render(), /English/);
+    assert.match(p.render(), /Português \(Brasil\)/);
+    await p.key(KEY.down, KEY.enter);
+  };
+  interactions.push(async (p) => {
+    assert.match(p.render(), /Current language: English/);
+    await choosePortuguese(p);
+    fits(p);
+    const s = p.render(120);
+    for (const text of ["Idioma atual: Inglês", "Português (Brasil)", "Ativas", "Configurações",
+      "Exibir skills selecionadas", "Diagnóstico", "↑↓ navegar"])
+      assert.ok(s.includes(text), `missing ${text}`);
     await assert.rejects(readFile(projectLocalePath, "utf8"), { code: "ENOENT" });
-    await panel.handleInput("escape");
-    assert.match(render(panel), /Há alterações sem salvar/);
-    assert.match(render(panel), /Rascunho do idioma: Português \(Brasil\)/);
-    await panel.handleInput("escape");
+    await p.key(KEY.esc);
+    assert.match(p.render(), /Há alterações não salvas/);
+    await p.key(KEY.esc);
     await assert.rejects(readFile(projectLocalePath, "utf8"), { code: "ENOENT" });
   });
   await command.handler("", dashboardTui);
 
-  interactions.push(async (panel) => {
-    assert.match(render(panel), /Current language: English/);
-    await openLanguageChoices(panel);
-    await panel.handleInput("down");
-    await panel.handleInput("enter");
-    await panel.drain();
-    assert.match(render(panel), /Rascunho do idioma: Português \(Brasil\)/);
-    await panel.handleInput("\u0013");
-    await waitFor(
-      () => render(panel).includes("Idioma salvo para este projeto."),
-      "Ctrl+S should persist the trusted project's language preference",
-    );
-    await panel.drain();
+  interactions.push(async (p) => {
+    assert.match(p.render(), /Current language: English/);
+    await choosePortuguese(p);
+    await p.key(KEY.ctrlS);
+    assert.match(p.render(), /Idioma salvo para este projeto\./);
     assert.equal(JSON.parse(await readFile(projectLocalePath, "utf8")).locale, "pt-BR");
-    await panel.close();
+    await p.key(KEY.esc);
   });
   await command.handler("", dashboardTui);
 
-  interactions.push(async (panel) => {
-    assert.match(render(panel), /Idioma atual: Português \(Brasil\)/);
-    assert.match(render(panel), /Configurações/);
-    await panel.close();
+  interactions.push(async (p) => {
+    assert.match(p.render(), /Idioma atual: Português \(Brasil\)/);
+    assert.match(p.render(), /Configurações/);
+    await p.key(KEY.esc);
   });
   await command.handler("", dashboardTui);
 
   const otherCwd = join(root, "other-project");
   await mkdir(otherCwd);
-  interactions.push(async (panel) => {
-    assert.match(render(panel), /Current language: English/);
-    assert.match(render(panel), /Settings/);
-    await panel.close();
+  interactions.push(async (p) => {
+    assert.match(p.render(), /Current language: English/);
+    assert.match(p.render(), /Settings/);
+    await p.key(KEY.esc);
   });
   await command.handler("", { ...dashboardTui, cwd: otherCwd });
 
@@ -418,26 +348,32 @@ test("extension loads independently and all discovery commands work without TUI"
   await writeFile(untrustedLocalePath, JSON.stringify({ schemaVersion: 1, locale: "pt-BR" }));
   const untrustedLocaleBefore = await readFile(untrustedLocalePath, "utf8");
   projectTrusted = false;
-  interactions.push(async (panel) => {
-    assert.match(render(panel), /Current language: English/);
-    await openLanguageChoices(panel);
-    await panel.handleInput("down");
-    await panel.handleInput("enter");
-    await panel.drain();
-    assert.match(render(panel), /Rascunho do idioma: Português \(Brasil\)/);
-    await panel.handleInput("\u0013");
-    await waitFor(
-      () => render(panel).includes("Confie neste projeto antes de salvar a preferência de idioma."),
-      "untrusted projects must not save locale preferences",
-    );
+  interactions.push(async (p) => {
+    assert.match(p.render(), /Current language: English/);
+    assert.match(p.render(120), /\[locked: project trust\]/);
+    await p.goto("language");
+    await p.key(KEY.enter);
+    assert.match(p.render(), /Trust this project before saving its language preference\./);
+    await p.key(KEY.esc, KEY.ctrlS);
     assert.equal(await readFile(untrustedLocalePath, "utf8"), untrustedLocaleBefore);
-    assert.match(render(panel), /Rascunho do idioma: Português \(Brasil\)/);
-    await panel.close();
+    await p.key(KEY.esc);
   });
   await command.handler("", { ...dashboardTui, cwd: untrustedCwd });
 
+  // Shutdown while the menu is open closes it through the owner signal.
+  projectTrusted = true;
+  let shutdown;
+  interactions.push(async (p) => {
+    await p.settle();
+    // Not awaited here: shutdown waits for the menu, which waits for this panel to close.
+    shutdown = handlers.get("session_shutdown")?.({}, ctx);
+  });
+  await command.handler("", dashboardTui);
+  await shutdown;
+  await handlers.get("session_start")?.({}, ctx);
+
   assert.equal(messages.length, priorMessages);
-  assert.equal(closedPanels, 10);
+  assert.equal(closedPanels, 11);
   assert.deepEqual([...commands.keys()], registeredCommandNames);
   assert.deepEqual([...tools.keys()].sort(), registeredToolNames);
   assert.ok(renderRequests > 0);

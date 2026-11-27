@@ -21,8 +21,8 @@ test("English and pt-BR catalogs have identical keys and placeholders", () => {
   assert.deepEqual([...messageKeys].sort(), Object.keys(catalogs.en).sort());
   for (const key of messageKeys)
     assert.deepEqual(placeholders(catalogs.en[key]), placeholders(catalogs["pt-BR"][key]), key);
-  assert.equal(translate("en", "menu.actionCount", { count: 4 }), "4 actions");
-  assert.equal(translate("pt-BR", "menu.actionCount", { count: 4 }), "4 ações");
+  assert.equal(translate("en", "notice.modeSaved", { mode: "Observe" }), "Saved mode: Observe.");
+  assert.equal(translate("pt-BR", "notice.modeSaved", { mode: "Observar" }), "Modo salvo: Observar.");
   assert.equal(isLocale("pt-BR"), true);
   assert.equal(isLocale("pt"), false);
 });

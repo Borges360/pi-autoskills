@@ -8,7 +8,7 @@ import {
   DefaultResourceLoader,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
-test("published Pi 1.2.0 loader accepts source and built distribution without credentials", async (t) => {
+test("published Pi 1.6.0 loader accepts source and built distribution without credentials", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "pi-native-loader-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   for (const path of ["../src/extension.ts", "../dist/extension.js"]) {

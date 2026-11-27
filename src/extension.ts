@@ -1,9 +1,14 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { register, toolResult } from "./common/runtime.js";
-import { createService, AutoSkills } from "./skills.js";
+import { createService, AutoSkills, autoSkillsMenuGroups } from "./skills.js";
+import { registerInteiroPiThemes } from "./vendor/inteiro-terminal/pi.js";
 export default function (pi: ExtensionAPI) {
-  const runtime = register(pi, "pi-autoskills", "autoskills", createService);
+  // Makes the design-system Pi themes available in /settings: no separate install, never selects one.
+  registerInteiroPiThemes(pi);
+  const runtime = register(pi, "pi-autoskills", "autoskills", createService, [], {
+    menuGroups: autoSkillsMenuGroups,
+  });
   pi.registerTool({
     name: "autoskills_select",
     label: "Select skills",
