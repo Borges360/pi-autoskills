@@ -7,6 +7,11 @@ Discover skills and playbooks deterministically, rank by task keywords, paths an
 `src/index.ts`; compiled declarations describe the public API: SkillDecision, SkillMetadata, AuditResult, TaskSignals, AutoSkills, selectSkills, discoverSkills, audit, installSkill.
 `src/common/` bundles this release's storage, configuration, security and event
 contracts. These are local copies with no runtime imports from sibling packages.
+`src/ui/menu.ts` builds the `/autoskills` panel on the Pi settings adapter vendored
+in `src/vendor/inteiro-terminal/` (a hash-verified copy with `patches: []`; see
+`src/vendor/THIRD_PARTY_NOTICES.md`). The adapter paints only with the Pi theme and
+measures cells with pi-tui; `runtime.ts` owns the menu lifecycle and aborts it on
+session shutdown.
 Each package owns exactly one state namespace. No shared database or load order is
 required. Optional integrations operate exclusively over versioned public events.
 
