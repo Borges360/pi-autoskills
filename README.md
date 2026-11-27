@@ -1,71 +1,141 @@
-# pi-autoskills
+# Pi Autoskills
 
-Relevant audited skills without expanding every prompt.
+**Package:** `@borges360/pi-autoskills` · **version:** `0.1.2`
 
-Discover skills and playbooks deterministically, rank by task keywords, paths and stack, disclose only selected content and retain hash-pinned provenance. Optional isolated delegation uses a synchronous ownership handshake with the specialist router.
+**Status:** development release. Git source is documented below. npm registry availability and publication have not been verified; package metadata does not establish registry availability.
 
-## Install
+**Compatibility:** Node.js `>=22.19`. The package uses Pi extension APIs; its declared coding-agent SDK is `1.2.0`, and an offline host smoke handled `/autoskills status` on Pi `1.4.0`. This does not establish a wider compatibility range.
 
-Requires Node >= 22.19 and Pi **1.2.0**. Install this Git repository with Pi:
+## English
 
-```sh
+### What it does
+
+Pi Autoskills discovers skills and playbooks from configured and trusted project roots, ranks them deterministically by task keywords, paths, and stack, then discloses only selected audited content with hash-pinned provenance. Explicit pins are respected. Optional delegation uses a synchronous ownership handshake with a specialist router.
+
+The extension defaults to file storage. SQLite and Pi Durable are opt-in. It does not require a sibling extension, remote classifier, or database driver for its default path.
+
+### Install and develop
+
+The repository advertises this Pi Git installation path:
+
+~~~sh
 pi install git:github.com/Borges360/pi-autoskills
-```
+~~~
 
-From a local checkout:
+This installs from Git; it is not an npm registry installation. Registry availability remains unverified until CT59.
 
-```sh
-npm ci
+For development, use the locked dependencies in `package-lock.json`, then run the local checks:
+
+~~~sh
 npm test
 npm run build
-pi -e ./src/extension.ts
-node dist/cli.js doctor
-```
-
-The source entry point is loadable directly by Pi; npm packages include source and
-compiled JavaScript/declarations. No sibling extension, SQLite driver, remote
-classifier or Durable installation is required for the default file backend.
-
-## Use
-
-Run `/autoskills` for the interactive menu, or `/autoskills status` for structured
-headless output. Domain actions: `show, detect, explain, pin <skill...>, pin clear, agents, delegate <agent> <objective>, audit <file>, install <file-or-https-url> <sha256> <id>, update <file-or-https-url> <sha256> <id>`. Shared actions: `auto`, `off`,
-`observe`, `config`, `doctor`, `storage status`, `storage migrate files|sqlite|durable`.
-The CLI uses the same actions: `node dist/cli.js status`.
-TUI groups: Active / Suggestions / Agents / Settings. Press Escape in a group
-to return to the categories; Escape in the categories closes the menu. Settings
-**config** opens a centered mode panel showing the current mode and a short
-explanation of each option. Use the arrow keys to choose, Enter to save, and
-Escape to return to Settings. Headless config returns validated settings. Edit
-the user config for advanced settings.
-
-Default state: `~/.pi/agent/state/pi-autoskills/projects/<sha256-of-canonical-repository-root>/`.
-`PI_ECOSYSTEM_STATE_ROOT` changes the parent state directory for testing or deployment.
-No project state is written implicitly.
-
-## Guarantees and validation
-
-Versioned optional events, bounded actions, optimistic record versions, secret
-redaction at output boundaries, checksum validation, append-only journal and
-fail-closed persistence. The same storage conformance tests run against files,
-SQLite and pinned Pi Durable 1.2.0. Fault tests kill a real process after a durable
-journal commit, race two processes and reject corrupt snapshots or symlink escapes.
-
-```sh
-npm test
 npm run lint
 npm run benchmark
 npm pack --dry-run
-```
+~~~
 
-This is a development release. Local correctness/recovery results do not establish
-SWE-bench/Terminal-Bench quality or inference-cost savings. See [benchmarks](benchmarks/README.md)
-and [acceptance status](ACCEPTANCE.md) for the limits of the evidence.
+The Pi extension entry point is `src/extension.ts`. The package also provides the `pi-autoskills` CLI at `dist/cli.js`.
 
-[Architecture](ARCHITECTURE.md) · [Configuration](CONFIGURATION.md) ·
-[Security](SECURITY.md) · [Migration](MIGRATION.md) · [Compatibility](COMPATIBILITY.md).
+### Use
 
-Git checkouts include the compiled worker and CLI. CI checks that a rebuild matches
-the committed distribution. Host-provided Pi packages, including the coding-agent SDK
-and Typebox, are declared as peer dependencies. Isolated child workers resolve the SDK
-from the active Pi installation.
+Run `/autoskills` to open the interactive menu. `/autoskills status` returns structured headless status. The menu groups are **Active**, **Suggestions**, **Agents**, and **Settings**. The Settings **config** panel displays the current mode; use the arrow keys to choose, Enter to apply, and Escape to return to Settings. The tested menu callbacks do not certify terminal rendering.
+
+Domain actions include `show`, `detect`, `explain`, `pin <skill...>`, `pin clear`, `agents`, `delegate <agent> <objective>`, `audit <file>`, `install <file-or-https-url> <sha256> <id>`, and `update <file-or-https-url> <sha256> <id>`. Shared actions include `auto`, `off`, `observe`, `config`, `doctor`, `storage status`, and `storage migrate files|sqlite|durable`. The CLI accepts the same actions; for example:
+
+~~~sh
+node dist/cli.js status
+node dist/cli.js doctor
+~~~
+
+`install` and `update` change the selected skill root and catalog. Use them only with an explicit source and expected SHA-256. Delegation may create child processes or worktrees; these actions were not invoked in the documentation checks.
+
+### Configuration and state
+
+User settings live at `~/.pi/agent/state/pi-autoskills/config.json`; `PI_ECOSYSTEM_STATE_ROOT` changes the parent directory for tests or deployment. Project settings use `.pi/pi-autoskills.json` and are read only after Pi trusts the project. Precedence is command override, trusted project configuration, user configuration, then built-in defaults. Project configuration cannot raise user security limits.
+
+Skills default to `~/.pi/agent/skills`, and agent definitions to `~/.pi/agent/agents`. Trusted projects may add `.pi/skills` and `.pi/agents`. The default mode is `auto`, storage is `files`, and write access is disabled. See [configuration](CONFIGURATION.md) for all settings.
+
+### Language
+
+This README is provided in English and Brazilian Portuguese. The menu starts in English. Open **Settings → Language** to preview English or Português (Brasil); **Ctrl+S** saves the preference only for the trusted project at `.pi/pi-autoskills.locale.json`. Missing or invalid preferences fall back to English. CLI actions and structured outputs keep their stable command values.
+
+### Privacy and security
+
+Pi extensions run with the operating-system privileges of the user; this package is not an OS sandbox. Selected skill content can be disclosed to the model. Secrets are redacted at output boundaries, but heuristics cannot detect every arbitrary secret. Do not put secrets in objectives, definitions, or artifacts. See [security](SECURITY.md) for the full boundary.
+
+Skill installation requires an explicit source, expected hash, successful static audit, and valid metadata. HTTPS fetches use timeout and size limits. Child credentials are allowlisted by environment-variable name; `auth.json` is not inherited.
+
+### Troubleshooting and limits
+
+Start with `node dist/cli.js doctor` and `node dist/cli.js status`. Use [architecture](ARCHITECTURE.md), [migration](MIGRATION.md), and [compatibility](COMPATIBILITY.md) for implementation and recovery details. The local storage benchmark makes no model quality or cost claim. See [acceptance evidence](ACCEPTANCE.md) and the [benchmark protocol](benchmarks/README.md).
+
+### License
+
+The software is MIT licensed; see [LICENSE](LICENSE). The bundled INTEIRO mark is separately attributed and licensed in [its asset notice](docs/assets/INTEIRO-MARK-LICENSE.txt).
+
+## Português (Brasil)
+
+### O que faz
+
+O Pi Autoskills descobre skills e playbooks em raízes configuradas e projetos confiáveis, classifica os resultados de forma determinística por palavras-chave, caminhos e stack e revela somente o conteúdo selecionado e auditado, com proveniência vinculada por hash. Pins explícitos são respeitados. A delegação opcional usa uma confirmação síncrona de propriedade com um roteador especialista.
+
+A extensão usa arquivos por padrão. SQLite e Pi Durable são opcionais. O caminho padrão não exige extensão irmã, classificador remoto ou driver de banco de dados.
+
+### Instalação e desenvolvimento
+
+O repositório informa este caminho de instalação Git no Pi:
+
+~~~sh
+pi install git:github.com/Borges360/pi-autoskills
+~~~
+
+Esse comando instala a partir do Git; não é uma instalação pela registry npm. A disponibilidade na registry continua sem verificação até CT59.
+
+Para desenvolvimento, use as dependências travadas em `package-lock.json` e execute as verificações locais:
+
+~~~sh
+npm test
+npm run build
+npm run lint
+npm run benchmark
+npm pack --dry-run
+~~~
+
+A entrada da extensão Pi é `src/extension.ts`. O pacote também oferece a CLI `pi-autoskills` em `dist/cli.js`.
+
+### Uso
+
+Execute `/autoskills` para abrir o menu interativo. `/autoskills status` retorna o estado estruturado para uso headless. Os grupos do menu são **Active**, **Suggestions**, **Agents** e **Settings**. O painel **config** mostra o modo atual; use as setas para escolher, Enter para aplicar e Esc para voltar a Settings. Os testes de callbacks não certificam a renderização no terminal.
+
+As ações de domínio incluem `show`, `detect`, `explain`, `pin <skill...>`, `pin clear`, `agents`, `delegate <agent> <objective>`, `audit <file>`, `install <file-or-https-url> <sha256> <id>` e `update <file-or-https-url> <sha256> <id>`. Ações compartilhadas incluem `auto`, `off`, `observe`, `config`, `doctor`, `storage status` e `storage migrate files|sqlite|durable`. A CLI aceita as mesmas ações. Exemplos:
+
+~~~sh
+node dist/cli.js status
+node dist/cli.js doctor
+~~~
+
+`install` e `update` alteram a raiz de skills escolhida e o catálogo. Use essas ações somente com origem explícita e SHA-256 esperado. Delegação pode criar processos filhos ou worktrees; essas ações não foram invocadas nas verificações da documentação.
+
+### Configuração e estado
+
+As preferências do usuário ficam em `~/.pi/agent/state/pi-autoskills/config.json`; `PI_ECOSYSTEM_STATE_ROOT` altera o diretório pai em testes ou implantação. Configurações do projeto ficam em `.pi/pi-autoskills.json` e só são lidas depois que o Pi confia no projeto. A precedência é override do comando, configuração de projeto confiável, configuração do usuário e defaults internos. A configuração do projeto não pode elevar limites de segurança do usuário.
+
+Skills ficam por padrão em `~/.pi/agent/skills`, e definições de agentes em `~/.pi/agent/agents`. Projetos confiáveis podem adicionar `.pi/skills` e `.pi/agents`. O modo padrão é `auto`, o armazenamento é `files` e o acesso de escrita fica desabilitado. Consulte [configuração](CONFIGURATION.md) para todas as opções.
+
+### Idioma
+
+Este README está em inglês e português brasileiro. O menu começa em inglês. Abra **Configurações → Idioma** para pré-visualizar inglês ou português (Brasil); **Ctrl+S** salva a preferência somente para o projeto confiável em `.pi/pi-autoskills.locale.json`. Preferências ausentes ou inválidas usam inglês como fallback. As ações da CLI e as saídas estruturadas mantêm seus valores estáveis.
+
+### Privacidade e segurança
+
+Extensões Pi executam com os privilégios do sistema operacional do usuário; este pacote não é um sandbox do sistema. Conteúdo de skills selecionadas pode ser revelado ao modelo. Segredos são redigidos nas saídas, mas heurísticas não detectam todos os segredos arbitrários. Não coloque segredos em objetivos, definições ou artefatos. Consulte [segurança](SECURITY.md) para a fronteira completa.
+
+A instalação de skills exige origem explícita, hash esperado, auditoria estática bem-sucedida e metadados válidos. Buscas HTTPS usam limites de tempo e tamanho. Credenciais de agentes filhos são permitidas por nome de variável de ambiente; `auth.json` não é herdado.
+
+### Diagnóstico e limites
+
+Comece com `node dist/cli.js doctor` e `node dist/cli.js status`. Consulte [arquitetura](ARCHITECTURE.md), [migração](MIGRATION.md) e [compatibilidade](COMPATIBILITY.md) para detalhes de implementação e recuperação. O benchmark local de armazenamento não faz afirmações sobre qualidade ou custo de modelos. Veja as [evidências de aceite](ACCEPTANCE.md) e o [protocolo de benchmark](benchmarks/README.md).
+
+### Licença
+
+O software usa a licença MIT; consulte [LICENSE](LICENSE). A marca INTEIRO incluída tem atribuição e licença próprias em [seu aviso](docs/assets/INTEIRO-MARK-LICENSE.txt).

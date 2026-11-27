@@ -60,7 +60,7 @@ export declare class Host {
     private initializeResources;
     close(): Promise<void>;
     serial<T>(fn: () => Promise<T>): Promise<T>;
-    configure(patch: Partial<Config>): Promise<{
+    configure(patch: Partial<Config>, signal?: AbortSignal): Promise<{
         schemaVersion: 1;
         enabled: boolean;
         mode: "auto" | "off" | "observe";
